@@ -5,6 +5,9 @@ import { Octokit } from "octokit";
 import fs from "fs/promises";
 import path from "path";
 
+// Force Node.js runtime (Edge Runtime blocks eval used by dependencies)
+export const runtime = "nodejs";
+
 type StepEvent = {
   step: string;
   status: "done" | "error";
