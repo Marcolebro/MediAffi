@@ -581,6 +581,10 @@ function buildSiteConfig(
       linkedin: body.linkedin?.trim() || "",
       instagram: body.instagram?.trim() || "",
     },
+    analytics: {
+      plausible_domain: "",
+      plausible_script: "",
+    },
     ads: {
       adsense_id: body.adsense_id?.trim() || "",
     },

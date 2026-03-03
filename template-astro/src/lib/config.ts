@@ -49,6 +49,17 @@ export interface SiteConfig {
   footer_links: NavLink[];
 }
 
+const defaults: Partial<SiteConfig> = {
+  social: { twitter: '', linkedin: '', instagram: '' },
+  analytics: { plausible_domain: '', plausible_script: '' },
+  ads: { adsense_id: '' },
+  newsletter: { resend_audience_id: '' },
+  supabase: { url: '', anon_key: '' },
+  nav_links: [],
+  footer_links: [],
+  categories: [],
+};
+
 function resolveEnvValues(obj: Record<string, unknown>): Record<string, unknown> {
   const resolved: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -64,4 +75,14 @@ function resolveEnvValues(obj: Record<string, unknown>): Record<string, unknown>
   return resolved;
 }
 
-export const config = resolveEnvValues(rawConfig as unknown as Record<string, unknown>) as unknown as SiteConfig;
+const resolved = resolveEnvValues(rawConfig as unknown as Record<string, unknown>) as Record<string, unknown>;
+
+export const config = {
+  ...defaults,
+  ...resolved,
+  social: { ...defaults.social, ...(resolved.social as Record<string, unknown> ?? {}) },
+  analytics: { ...defaults.analytics, ...(resolved.analytics as Record<string, unknown> ?? {}) },
+  ads: { ...defaults.ads, ...(resolved.ads as Record<string, unknown> ?? {}) },
+  newsletter: { ...defaults.newsletter, ...(resolved.newsletter as Record<string, unknown> ?? {}) },
+  supabase: { ...defaults.supabase, ...(resolved.supabase as Record<string, unknown> ?? {}) },
+} as unknown as SiteConfig;
