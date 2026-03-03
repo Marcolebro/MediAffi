@@ -21,7 +21,7 @@ export default async function ArticlesPage({ params, searchParams }: Props) {
       status: status || undefined,
       page: currentPage,
       perPage: 25,
-    }),
+    }).catch(() => ({ articles: [], total: 0 })),
     getSiteById(supabase, siteId),
   ]);
 

@@ -9,10 +9,11 @@ import { Activity, FileText, Eye, DollarSign } from "lucide-react";
 
 export default async function OverviewPage() {
   const supabase = await createClient();
+  const defaultStats = { activeSites: 0, articlesToday: 0, traffic7d: 0, revenue30d: 0, dailyMetrics: [] };
   const [stats, articles, sites] = await Promise.all([
-    getOverviewStats(supabase, 30),
-    getLatestArticles(supabase, 5),
-    getAllSites(supabase),
+    getOverviewStats(supabase, 30).catch(() => defaultStats),
+    getLatestArticles(supabase, 5).catch(() => []),
+    getAllSites(supabase).catch(() => []),
   ]);
 
   return (

@@ -9,13 +9,13 @@ import Link from "next/link";
 
 export default async function SitesPage() {
   const supabase = await createClient();
-  const sites = await getAllSites(supabase);
+  const sites = await getAllSites(supabase).catch(() => []);
 
   const sitesWithStats = await Promise.all(
     sites.map(async (site) => {
       const [articleCount, metrics7d] = await Promise.all([
-        getSiteArticleCount(supabase, site.id),
-        getSiteMetrics(supabase, site.id, 7),
+        getSiteArticleCount(supabase, site.id).catch(() => 0),
+        getSiteMetrics(supabase, site.id, 7).catch(() => []),
       ]);
       const pageviews7d = metrics7d.reduce((sum, m) => sum + m.pageviews, 0);
       return { site, articleCount, pageviews7d };
