@@ -60,6 +60,7 @@ const SKIP_PATTERNS = new Set([
   ".DS_Store",
   ".env",
   ".env.production",
+  "articles",
 ]);
 
 export async function POST(request: Request) {
