@@ -561,7 +561,7 @@ function buildSiteConfig(
 
   return {
     name: body.name.trim(),
-    domain: body.domain?.trim() || "",
+    domain: body.domain?.trim() || `https://${body.slug.trim()}.vercel.app`,
     language: "fr",
     description: body.description?.trim() || "",
     tagline: body.name.trim(),
