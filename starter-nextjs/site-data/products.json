@@ -1,0 +1,162 @@
+{
+  "products": [
+    {
+      "slug": "betclic",
+      "name": "Betclic",
+      "description": "Betclic est l'un des casinos en ligne les plus populaires en France, reconnu pour son large catalogue de jeux, ses bonus généreux et son interface intuitive. Agréé par l'ANJ, il offre une expérience de jeu sécurisée et fiable pour les joueurs français.",
+      "category": "casinos-en-ligne",
+      "rating": 9.5,
+      "image": "/images/products/betclic.png",
+      "bonus": "100€ offerts",
+      "bonus_conditions": "Bonus de bienvenue de 100€ offerts pour tout premier dépôt. Mise requise x5 sur les paris sportifs. Valable 30 jours après activation.",
+      "price": "Gratuit",
+      "pros": [
+        "Agréé ANJ et 100% légal en France",
+        "Large catalogue de jeux (slots, live, table)",
+        "Application mobile performante et intuitive",
+        "Retraits rapides sous 24-48h"
+      ],
+      "cons": [
+        "Bonus soumis à conditions de mise",
+        "Service client parfois lent en période de pointe"
+      ],
+      "affiliate_slug": "betclic",
+      "affiliate_url": "https://kazwin.fr/go/betclic",
+      "features": {
+        "licence": "ANJ (Autorité Nationale des Jeux)",
+        "paiement": "Visa, Mastercard, PayPal, Virement bancaire",
+        "support": "Chat en direct, Email, Téléphone",
+        "mobile": "Application iOS et Android",
+        "jeux": "Slots, Roulette, Blackjack, Live Casino"
+      },
+      "badge": "Meilleur choix"
+    },
+    {
+      "slug": "unibet",
+      "name": "Unibet",
+      "description": "Unibet est une plateforme de jeux en ligne internationale proposant une offre complète alliant casino, paris sportifs et poker. Présent en France depuis des années, Unibet se distingue par ses promotions régulières et son programme de fidélité avantageux.",
+      "category": "casinos-en-ligne",
+      "rating": 9.2,
+      "image": "/images/products/unibet.png",
+      "bonus": "200€ de bonus",
+      "bonus_conditions": "Bonus de bienvenue jusqu'à 200€ pour les nouveaux joueurs. Dépôt minimum de 10€ requis. Conditions de mise x30 applicables sur le bonus. Offre valable 60 jours.",
+      "price": "Gratuit",
+      "pros": [
+        "Bonus de bienvenue parmi les plus élevés du marché",
+        "Programme de fidélité avec cashback hebdomadaire",
+        "Catalogue de jeux très diversifié",
+        "Support client disponible 24h/24 et 7j/7"
+      ],
+      "cons": [
+        "Interface parfois complexe pour les nouveaux joueurs",
+        "Conditions de mise élevées sur le bonus",
+        "Délais de vérification KYC pouvant être longs"
+      ],
+      "affiliate_slug": "unibet",
+      "affiliate_url": "https://kazwin.fr/go/unibet",
+      "features": {
+        "licence": "ANJ (Autorité Nationale des Jeux)",
+        "paiement": "Visa, Mastercard, Skrill, Neteller, Virement",
+        "support": "Chat en direct 24/7, Email, FAQ complète",
+        "mobile": "Application iOS et Android + site mobile optimisé",
+        "jeux": "Slots, Live Casino, Poker, Paris Sportifs"
+      },
+      "badge": "Populaire"
+    },
+    {
+      "slug": "pokerstars",
+      "name": "PokerStars Casino",
+      "description": "PokerStars Casino est la branche casino du leader mondial du poker en ligne. Fort de sa réputation internationale, PokerStars Casino propose une sélection premium de machines à sous, jeux de table et tables live animées par des croupiers professionnels.",
+      "category": "casinos-en-ligne",
+      "rating": 9.0,
+      "image": "/images/products/pokerstars.png",
+      "bonus": "50 tours gratuits",
+      "bonus_conditions": "50 tours gratuits offerts sans dépôt à l'inscription. Gains des tours soumis à une mise x40. Retrait maximum des gains issus des tours : 100€. Offre réservée aux nouveaux joueurs.",
+      "price": "Gratuit",
+      "pros": [
+        "Marque internationale de confiance avec des années d'expérience",
+        "Bonus sans dépôt attractif pour débuter",
+        "Section live casino de très haute qualité",
+        "Logiciels de jeu équitables et certifiés"
+      ],
+      "cons": [
+        "Conditions de mise sur les tours gratuits assez strictes",
+        "Moins de méthodes de paiement que certains concurrents"
+      ],
+      "affiliate_slug": "pokerstars",
+      "affiliate_url": "https://kazwin.fr/go/pokerstars",
+      "features": {
+        "licence": "ANJ (Autorité Nationale des Jeux)",
+        "paiement": "Visa, Mastercard, PayPal, Skrill",
+        "support": "Chat en direct, Email, Centre d'aide en ligne",
+        "mobile": "Application iOS et Android dédiée casino",
+        "jeux": "Slots, Blackjack, Roulette, Baccarat, Live Casino"
+      },
+      "badge": null
+    },
+    {
+      "slug": "winamax",
+      "name": "Winamax",
+      "description": "Winamax est un opérateur français incontournable, particulièrement réputé pour ses paris sportifs et son offre poker. Son casino en ligne propose une sélection soignée de jeux et des promotions régulières adaptées au marché français.",
+      "category": "casinos-en-ligne",
+      "rating": 8.8,
+      "image": "/images/products/winamax.png",
+      "bonus": "150€ offerts",
+      "bonus_conditions": "Bonus de bienvenue jusqu'à 150€ pour le premier dépôt. Offre combinée casino et paris sportifs. Mise requise x10 sur les paris sportifs cotes min. 1.70. Valable 30 jours.",
+      "price": "Gratuit",
+      "pros": [
+        "Opérateur 100% français, reconnu et de confiance",
+        "Excellente section poker et paris sportifs",
+        "Promotions hebdomadaires et tournois réguliers",
+        "Interface claire et ergonomique"
+      ],
+      "cons": [
+        "Catalogue casino moins fourni que les concurrents",
+        "Bonus principalement orienté paris sportifs",
+        "Pas de support téléphonique disponible"
+      ],
+      "affiliate_slug": "winamax",
+      "affiliate_url": "https://kazwin.fr/go/winamax",
+      "features": {
+        "licence": "ANJ (Autorité Nationale des Jeux)",
+        "paiement": "Visa, Mastercard, Virement bancaire, PayPal",
+        "support": "Chat en direct, Email, FAQ détaillée",
+        "mobile": "Application iOS et Android très bien notée",
+        "jeux": "Slots, Poker, Paris Sportifs, Jeux de table"
+      },
+      "badge": "Fiable"
+    },
+    {
+      "slug": "parions-sport",
+      "name": "Parions Sport",
+      "description": "Parions Sport en Ligne est la plateforme officielle de la Française des Jeux dédiée aux paris sportifs. Bénéficiant de la notoriété et de la confiance associées à la FDJ, elle propose une offre solide de paris sur tous les sports majeurs avec des cotes compétitives.",
+      "category": "paris-sportifs",
+      "rating": 8.5,
+      "image": "/images/products/parions-sport.png",
+      "bonus": "100€ de freebets",
+      "bonus_conditions": "100€ de freebets offerts pour tout premier dépôt d'au moins 10€. Freebets disponibles en 5 fois 20€. Valables 7 jours après attribution. Cote minimum 1.50 requise pour l'utilisation.",
+      "price": "Gratuit",
+      "pros": [
+        "Marque FDJ, gage de confiance et de sérieux",
+        "Large couverture des événements sportifs mondiaux",
+        "Cotes compétitives sur les sports populaires",
+        "Réseau de points de vente physiques en complément"
+      ],
+      "cons": [
+        "Offre casino limitée comparée aux spécialistes",
+        "Application mobile moins moderne que la concurrence",
+        "Freebets avec conditions d'utilisation restrictives"
+      ],
+      "affiliate_slug": "parions-sport",
+      "affiliate_url": "https://kazwin.fr/go/parions-sport",
+      "features": {
+        "licence": "ANJ (Autorité Nationale des Jeux)",
+        "paiement": "Visa, Mastercard, Virement bancaire, FDJ Pass",
+        "support": "Chat en direct, Email, Points de vente FDJ",
+        "mobile": "Application iOS et Android + bornes en point de vente",
+        "jeux": "Paris Sportifs, Paris en direct, Paris combinés"
+      },
+      "badge": null
+    }
+  ]
+}
