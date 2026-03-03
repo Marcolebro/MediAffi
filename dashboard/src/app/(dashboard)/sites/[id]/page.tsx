@@ -26,10 +26,10 @@ export default async function SiteDetailPage({ params }: Props) {
   }
 
   const [siteMetrics, topArticlesData, queue, socialPosts] = await Promise.all([
-    getSiteMetrics(supabase, id, 30),
-    getSiteTopArticles(supabase, id, 30, 5),
-    getQueue(supabase, id),
-    getSocialPosts(supabase, id, 20),
+    getSiteMetrics(supabase, id, 30).catch(() => []),
+    getSiteTopArticles(supabase, id, 30, 5).catch(() => ({ top: [], flop: [] })),
+    getQueue(supabase, id).catch(() => []),
+    getSocialPosts(supabase, id, 20).catch(() => []),
   ]);
 
   return (

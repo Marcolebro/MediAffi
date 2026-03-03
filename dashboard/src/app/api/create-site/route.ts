@@ -318,7 +318,7 @@ export async function POST(request: Request) {
 
         const project = await createRes.json();
         vercelProjectName = project.name;
-        vercelUrl = `https://${project.name}.vercel.app`;
+        vercelUrl = `${project.name}.vercel.app`;
 
         // Set environment variables
         const envVars = [
@@ -371,7 +371,7 @@ Génère aussi 4-5 catégories pertinentes pour le site, chacune avec slug, name
 Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
 { "categories": [{ "slug": "...", "name": "...", "description": "..." }], "articles": [{ "keyword": "...", "type": "...", "priority": 1 }] }`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const geminiRes = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
