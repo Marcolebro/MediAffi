@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://iapouravocats.fr/sitemap-index.xml

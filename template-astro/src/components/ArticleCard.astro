@@ -1,0 +1,91 @@
+---
+interface Props {
+  title: string;
+  slug: string;
+  date: string;
+  category: string;
+  type: string;
+  image?: string;
+  meta_description: string;
+}
+
+const { title, slug, date, category, type, image, meta_description } = Astro.props;
+
+const formattedDate = new Date(date).toLocaleDateString("fr-FR", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+const typeIcons: Record<string, string> = {
+  guide: "📖",
+  comparatif: "⚖️",
+  avis: "★",
+  actualite: "📰",
+  tutoriel: "🎓",
+};
+
+const typeIcon = typeIcons[type.toLowerCase()] ?? "📄";
+---
+
+<a
+  href={`/${slug}`}
+  class="group block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+>
+  {
+    image ? (
+      <div class="aspect-video overflow-hidden">
+        <img
+          src={image}
+          alt={title}
+          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+        />
+      </div>
+    ) : (
+      <div
+        class="aspect-video flex flex-col items-center justify-center gap-2"
+        style="background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 12%, transparent), color-mix(in srgb, var(--color-accent) 10%, transparent));"
+      >
+        <span class="text-4xl" aria-hidden="true">{typeIcon}</span>
+        <span
+          class="text-xs font-medium uppercase tracking-wide"
+          style="color: var(--color-primary); opacity: 0.7;"
+        >
+          {type}
+        </span>
+      </div>
+    )
+  }
+
+  <div class="p-4 flex flex-col gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span
+        class="text-xs font-medium px-2.5 py-0.5 rounded-full"
+        style="background-color: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary);"
+      >
+        {category}
+      </span>
+      <span
+        class="text-xs font-medium px-2.5 py-0.5 rounded-full"
+        style="background-color: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-accent);"
+      >
+        {type}
+      </span>
+    </div>
+
+    <h3 class="font-semibold text-lg leading-snug line-clamp-2 text-gray-900 group-hover:text-[var(--color-primary)] transition-colors duration-150">
+      {title}
+    </h3>
+
+    <p class="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+      {meta_description}
+    </p>
+
+    <div class="pt-1 border-t border-gray-100">
+      <time datetime={date} class="text-xs text-gray-400">
+        {formattedDate}
+      </time>
+    </div>
+  </div>
+</a>

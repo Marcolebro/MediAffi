@@ -1,0 +1,17 @@
+{
+  "name": "media-sites-builder",
+  "version": "1.0.0",
+  "description": "Système automatisé de création et gestion de sites d'affiliation/médias",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "daily": "node scripts/daily-pipeline.js",
+    "weekly": "node scripts/weekly-pipeline.js",
+    "test": "node scripts/test-pipeline.js",
+    "test:weekly": "node scripts/test-pipeline.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "playwright": "^1.40.0"
+  }
+}

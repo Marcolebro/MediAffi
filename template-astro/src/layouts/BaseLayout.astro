@@ -1,0 +1,139 @@
+---
+import { config } from '../lib/config';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+
+export interface Props {
+  title: string;
+  description: string;
+  image?: string;
+  article?: boolean;
+}
+
+const { title, description, image, article = false } = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, `https://${config.domain}`);
+const ogImage = image ?? `https://${config.domain}/og-default.png`;
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': article ? 'Article' : 'WebSite',
+  name: config.name,
+  url: `https://${config.domain}`,
+  description: config.description,
+  ...(article
+    ? {
+        headline: title,
+        image: ogImage,
+        author: {
+          '@type': 'Organization',
+          name: config.author,
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: config.name,
+          url: `https://${config.domain}`,
+        },
+      }
+    : {
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `https://${config.domain}/recherche?q={search_term_string}`,
+          },
+          'query-input': 'required name=search_term_string',
+        },
+      }),
+};
+---
+
+<!doctype html>
+<html lang={config.language}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="canonical" href={canonicalURL} />
+
+    <title>{title} — {config.name}</title>
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={`${title} — ${config.name}`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content={config.name} />
+    <meta property="og:locale" content={config.language === 'fr' ? 'fr_FR' : config.language} />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${title} — ${config.name}`} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    {config.social.twitter && (
+      <meta name="twitter:site" content={`@${config.social.twitter.replace(/^@/, '')}`} />
+    )}
+
+    <!-- CSS custom properties from config colors -->
+    <style define:vars={{
+      'color-primary': config.colors.primary,
+      'color-accent': config.colors.accent,
+      'color-bg': config.colors.background,
+      'color-text': config.colors.text,
+    }}>
+      :root {
+        --color-primary: var(--color-primary);
+        --color-accent: var(--color-accent);
+        --color-bg: var(--color-bg);
+        --color-text: var(--color-text);
+      }
+    </style>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Plausible Analytics -->
+    {config.analytics.plausible_domain && (
+      <script
+        defer
+        data-domain={config.analytics.plausible_domain}
+        src={config.analytics.plausible_script || 'https://plausible.io/js/script.js'}
+      />
+    )}
+
+    <!-- Google AdSense -->
+    {config.ads.adsense_id && (
+      <script
+        async
+        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${config.ads.adsense_id}`}
+        crossorigin="anonymous"
+      />
+    )}
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json" set:html={JSON.stringify(websiteSchema)} />
+  </head>
+
+  <body>
+    <Header />
+
+    <main>
+      <slot />
+    </main>
+
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,93 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Restez informé",
+  description = "Recevez nos derniers articles et guides directement dans votre boîte mail.",
+} = Astro.props;
+---
+
+<div class="rounded-xl p-8 text-center text-white" style="background-color: var(--color-primary);">
+  <h2 class="text-2xl font-bold">{title}</h2>
+  <p class="mt-2 text-white/80">{description}</p>
+
+  <form
+    id="newsletter-form"
+    class="mt-6 flex max-w-md mx-auto flex-col gap-3 md:flex-row"
+    novalidate
+  >
+    <input
+      type="email"
+      name="email"
+      required
+      class="w-full rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2"
+      style="focus-ring-color: var(--color-accent);"
+      placeholder="Votre email"
+      autocomplete="email"
+    />
+    <button
+      type="submit"
+      id="newsletter-submit"
+      class="whitespace-nowrap rounded-lg px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+      style="background-color: var(--color-accent);"
+    >
+      S'inscrire
+    </button>
+  </form>
+
+  <p id="newsletter-error" class="mt-3 hidden text-sm text-red-300">
+    Une erreur est survenue. Veuillez réessayer.
+  </p>
+</div>
+
+<script>
+  const form = document.getElementById("newsletter-form") as HTMLFormElement | null;
+  const submitBtn = document.getElementById("newsletter-submit") as HTMLButtonElement | null;
+  const errorMsg = document.getElementById("newsletter-error") as HTMLParagraphElement | null;
+
+  if (form && submitBtn && errorMsg) {
+    form.addEventListener("submit", async (e: Event) => {
+      e.preventDefault();
+
+      const emailInput = form.querySelector<HTMLInputElement>('input[name="email"]');
+      const email = emailInput?.value?.trim();
+
+      if (!email) return;
+
+      // Disable button and show loading state
+      submitBtn.disabled = true;
+      submitBtn.textContent = "...";
+      errorMsg.classList.add("hidden");
+
+      try {
+        const response = await fetch("/api/newsletter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+
+        // Success: replace form with confirmation message
+        const container = form.parentElement;
+        if (container) {
+          form.remove();
+          const success = document.createElement("p");
+          success.className = "mt-6 text-lg font-semibold text-white";
+          success.textContent = "Merci\u00a0! Vous êtes inscrit.";
+          container.appendChild(success);
+        }
+      } catch {
+        // Error: re-enable button and show error message
+        submitBtn.disabled = false;
+        submitBtn.textContent = "S'inscrire";
+        errorMsg.classList.remove("hidden");
+      }
+    });
+  }
+</script>

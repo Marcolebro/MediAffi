@@ -1,0 +1,104 @@
+---
+export interface BreadcrumbItem {
+  label: string;
+  href?: string;
+}
+
+interface Props {
+  items: BreadcrumbItem[];
+}
+
+const { items } = Astro.props;
+
+// Build Schema.org BreadcrumbList structured data
+const schemaItems = items.map((item, index) => ({
+  '@type': 'ListItem',
+  position: index + 1,
+  name: item.label,
+  ...(item.href ? { item: Astro.url.origin + item.href } : {}),
+}));
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: schemaItems,
+};
+---
+
+<nav aria-label="Fil d'Ariane" class="breadcrumb">
+  <ol class="breadcrumb__list" role="list">
+    {items.map((item, index) => {
+      const isLast = index === items.length - 1;
+      return (
+        <li class="breadcrumb__item">
+          {!isLast && item.href ? (
+            <a href={item.href} class="breadcrumb__link">
+              {item.label}
+            </a>
+          ) : (
+            <span
+              class={isLast ? 'breadcrumb__current' : 'breadcrumb__link'}
+              aria-current={isLast ? 'page' : undefined}
+            >
+              {item.label}
+            </span>
+          )}
+          {!isLast && (
+            <span class="breadcrumb__separator" aria-hidden="true">&rsaquo;</span>
+          )}
+        </li>
+      );
+    })}
+  </ol>
+</nav>
+
+<!-- Schema.org BreadcrumbList JSON-LD -->
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+
+<style>
+  .breadcrumb {
+    padding-block: 0.75rem;
+  }
+
+  .breadcrumb__list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .breadcrumb__item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .breadcrumb__link {
+    color: #4b5563;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .breadcrumb__link:hover {
+    color: var(--color-accent, #e67e22);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .breadcrumb__current {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .breadcrumb__separator {
+    color: #9ca3af;
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+  }
+</style>

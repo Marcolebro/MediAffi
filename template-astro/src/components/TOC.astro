@@ -1,0 +1,41 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+
+const filtered = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  filtered.length > 0 && (
+    <nav
+      aria-label="Table des matières"
+      class="sticky top-24 border-l-2 border-gray-200 pl-4"
+    >
+      <p class="font-semibold text-sm uppercase tracking-wide text-gray-700 mb-3">
+        Sommaire
+      </p>
+
+      <ol class="flex flex-col gap-1.5">
+        {filtered.map((heading) => (
+          <li class={heading.depth === 3 ? "pl-4" : ""}>
+            <a
+              href={`#${heading.slug}`}
+              class="text-sm text-gray-600 hover:text-[var(--color-accent)] transition-colors duration-150 leading-snug block py-0.5"
+            >
+              {heading.text}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}

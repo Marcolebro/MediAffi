@@ -1,0 +1,62 @@
+---
+import { config } from '../lib/config';
+import CTABox from './CTABox.astro';
+import AdSlot from './AdSlot.astro';
+
+interface Props {
+  popularArticles?: Array<{ title: string; slug: string; date: string }>;
+}
+
+const { popularArticles = [] } = Astro.props;
+---
+
+<aside class="space-y-8">
+  {/* Affiliate CTA */}
+  <CTABox
+    title="Notre recommandation"
+    description="Découvrez les meilleurs outils IA sélectionnés par notre équipe d'experts."
+    buttonText="Voir notre sélection →"
+    url="/categorie/assistants-ia"
+  />
+
+  {/* Popular articles */}
+  {popularArticles.length > 0 && (
+    <div class="rounded-lg border border-gray-200 p-5">
+      <h3 class="font-semibold text-sm uppercase tracking-wide text-gray-500 mb-4">Articles populaires</h3>
+      <ul class="space-y-3">
+        {popularArticles.map((article) => (
+          <li>
+            <a href={`/${article.slug}`} class="block group">
+              <span class="text-sm font-medium text-gray-900 group-hover:text-[--color-accent] transition-colors line-clamp-2">
+                {article.title}
+              </span>
+              <span class="text-xs text-gray-400 mt-1 block">
+                {new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(article.date))}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
+  {/* Ad slot */}
+  <AdSlot format="rectangle" />
+
+  {/* Categories */}
+  <div class="rounded-lg border border-gray-200 p-5">
+    <h3 class="font-semibold text-sm uppercase tracking-wide text-gray-500 mb-4">Catégories</h3>
+    <ul class="space-y-2">
+      {config.categories.map((cat) => (
+        <li>
+          <a
+            href={`/categorie/${cat.slug}`}
+            class="text-sm text-gray-700 hover:text-[--color-accent] transition-colors"
+          >
+            {cat.name}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</aside>

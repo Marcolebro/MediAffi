@@ -1,0 +1,31 @@
+name: Weekly Pipeline
+
+on:
+  schedule:
+    - cron: '0 9 * * 5'  # Every Friday at 9h UTC
+  workflow_dispatch: {}    # Manual trigger
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run weekly pipeline
+        run: node scripts/weekly-pipeline.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PLAUSIBLE_API_KEY: ${{ secrets.PLAUSIBLE_API_KEY }}
+          GOOGLE_SEARCH_CONSOLE_KEY: ${{ secrets.GOOGLE_SEARCH_CONSOLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

@@ -1,0 +1,211 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+import TOC from '../components/TOC.astro';
+import ShareButtons from '../components/ShareButtons.astro';
+import Sidebar from '../components/Sidebar.astro';
+import AdSlot from '../components/AdSlot.astro';
+import Rating from '../components/Rating.astro';
+import { config } from '../lib/config';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    date: string;
+    category: string;
+    type: string;
+    rating?: number;
+    image?: string;
+    meta_description: string;
+    author?: string;
+    affiliate_link?: string;
+    tags: string[];
+  };
+  headings: {
+    depth: number;
+    slug: string;
+    text: string;
+  }[];
+}
+
+const { frontmatter, headings } = Astro.props;
+
+const {
+  title,
+  date,
+  category,
+  type,
+  rating,
+  image,
+  meta_description,
+  author,
+  affiliate_link,
+  tags,
+} = frontmatter;
+
+const formattedDate = new Intl.DateTimeFormat('fr-FR', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+}).format(new Date(date));
+
+// Estimate reading time based on slot content word count approximation via headings
+// We use a rough estimate based on headings count as a proxy (actual word count
+// comes from the rendered slot). A common approach: expose a readingTime from
+// remark, but here we compute a safe fallback from headings length.
+const estimatedReadingTime = Math.max(1, Math.ceil(headings.length * 1.5));
+
+const breadcrumbItems = [
+  { label: 'Accueil', href: '/' },
+  { label: category, href: `/categorie/${category.toLowerCase().replace(/\s+/g, '-')}` },
+  { label: title, href: '' },
+];
+
+const siteUrl = `https://${config.domain}`;
+
+const articleJsonLd: Record<string, unknown> = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  datePublished: date,
+  description: meta_description,
+  author: {
+    '@type': 'Person',
+    name: author ?? config.name,
+  },
+  ...(image ? { image: `${siteUrl}${image}` } : {}),
+  publisher: {
+    '@type': 'Organization',
+    name: config.name,
+  },
+};
+
+const reviewJsonLd: Record<string, unknown> | null =
+  type === 'review' && rating != null
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Review',
+        name: title,
+        reviewBody: meta_description,
+        datePublished: date,
+        author: {
+          '@type': 'Person',
+          name: author ?? config.name,
+        },
+        reviewRating: {
+          '@type': 'Rating',
+          ratingValue: rating,
+          bestRating: 10,
+          worstRating: 0,
+        },
+        ...(image ? { image: `${siteUrl}${image}` } : {}),
+      }
+    : null;
+---
+
+<BaseLayout
+  title={title}
+  description={meta_description}
+  image={image}
+  article={true}
+>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Breadcrumb -->
+    <Breadcrumb items={breadcrumbItems} />
+
+    <div class="mt-6 flex flex-col lg:flex-row lg:gap-12">
+
+      <!-- Main content column -->
+      <main class="w-full lg:w-2/3">
+
+        <!-- Article header -->
+        <header class="mb-8">
+          <h1 class="text-3xl font-bold leading-tight text-gray-900 dark:text-white mb-4">
+            {title}
+          </h1>
+
+          <!-- Meta info -->
+          <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+            <time datetime={date}>{formattedDate}</time>
+            <span aria-hidden="true">&middot;</span>
+            <span class="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-0.5 text-xs font-medium text-blue-800 dark:text-blue-200">
+              {category}
+            </span>
+            <span aria-hidden="true">&middot;</span>
+            <span>{estimatedReadingTime} min de lecture</span>
+            {author && (
+              <>
+                <span aria-hidden="true">&middot;</span>
+                <span>Par {author}</span>
+              </>
+            )}
+          </div>
+
+          <!-- Rating (shown in header when it exists) -->
+          {rating != null && (
+            <div class="mt-4">
+              <Rating value={rating} />
+            </div>
+          )}
+        </header>
+
+        <!-- TOC -->
+        {headings.length > 0 && (
+          <div class="mb-8">
+            <TOC headings={headings} />
+          </div>
+        )}
+
+        <!-- Ad slot after intro -->
+        <div class="mb-8">
+          <AdSlot slot="after-intro" />
+        </div>
+
+        <!-- Article body -->
+        <div class="prose prose-gray dark:prose-invert max-w-none">
+          <slot />
+        </div>
+
+        <!-- Ad slot after content -->
+        <div class="mt-8">
+          <AdSlot slot="after-content" />
+        </div>
+
+        <!-- Share buttons -->
+        <div class="mt-8">
+          <ShareButtons title={title} url={Astro.url.href} />
+        </div>
+
+        <!-- Tags -->
+        {tags.length > 0 && (
+          <div class="mt-8 flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <a
+                href={`/tag/${tag.toLowerCase().replace(/\s+/g, '-')}`}
+                class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                #{tag}
+              </a>
+            ))}
+          </div>
+        )}
+
+      </main>
+
+      <!-- Sidebar column -->
+      <aside class="w-full lg:w-1/3 mt-10 lg:mt-0">
+        <Sidebar />
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- Schema.org Article JSON-LD -->
+  <script type="application/ld+json" set:html={JSON.stringify(articleJsonLd)} />
+
+  <!-- Schema.org Review JSON-LD (only for review type with rating) -->
+  {reviewJsonLd && (
+    <script type="application/ld+json" set:html={JSON.stringify(reviewJsonLd)} />
+  )}
+</BaseLayout>

@@ -1,0 +1,33 @@
+---
+export const prerender = false;
+
+import { config } from '../../lib/config';
+import { supabase } from '../../lib/supabase';
+
+const { product } = Astro.params;
+
+const program = product ? config.affiliate_programs[product] : undefined;
+
+if (!program) {
+  return new Response('Produit non trouvé', { status: 404 });
+}
+
+if (supabase) {
+  supabase
+    .from('affiliate_clicks')
+    .insert({
+      product_slug: product,
+      site_domain: config.domain,
+      referrer: Astro.request.headers.get('referer') || '',
+      user_agent: Astro.request.headers.get('user-agent') || '',
+      clicked_at: new Date().toISOString(),
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.error('[affiliate_clicks] Insert error:', error.message);
+      }
+    });
+}
+
+return Astro.redirect(program.url, 302);
+---

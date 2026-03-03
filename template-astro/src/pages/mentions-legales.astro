@@ -1,0 +1,119 @@
+---
+import { config } from '../lib/config';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const currentYear = new Date().getFullYear();
+---
+
+<BaseLayout
+  title="Mentions légales"
+  description={`Mentions légales du site ${config.name} (${config.domain}) — informations sur l'éditeur, l'hébergement, la protection des données et les liens d'affiliation.`}
+>
+  <div class="max-w-3xl mx-auto px-4 py-16">
+    <article class="prose prose-gray max-w-none">
+      <h1>Mentions légales</h1>
+
+      <p class="text-sm text-gray-500">Dernière mise à jour : {currentYear}</p>
+
+      <h2>1. Éditeur du site</h2>
+      <p>
+        Le site <strong>{config.domain}</strong> est édité par :<br />
+        <strong>{config.name}</strong><br />
+        Site web : <a href={`https://${config.domain}`}>{config.domain}</a><br />
+        Contact : <a href={`mailto:contact@${config.domain}`}>contact@{config.domain}</a>
+      </p>
+
+      <h2>2. Hébergement</h2>
+      <p>
+        Ce site est hébergé par :<br />
+        <strong>Vercel Inc.</strong><br />
+        440 N Barranca Ave #4133<br />
+        Covina, CA 91723<br />
+        États-Unis<br />
+        Site web : <a href="https://vercel.com" target="_blank" rel="noopener noreferrer">vercel.com</a>
+      </p>
+
+      <h2>3. Propriété intellectuelle</h2>
+      <p>
+        L'ensemble du contenu présent sur le site {config.name} (textes, images, graphiques, logos,
+        icônes, sons, logiciels, etc.) est la propriété exclusive de {config.name} ou de ses
+        partenaires, et est protégé par les lois françaises et internationales relatives à la
+        propriété intellectuelle.
+      </p>
+      <p>
+        Toute reproduction, représentation, modification, publication ou adaptation de tout ou
+        partie des éléments du site, quel que soit le moyen ou le procédé utilisé, est interdite
+        sans l'autorisation écrite préalable de {config.name}.
+      </p>
+
+      <h2>4. Données personnelles (RGPD)</h2>
+      <p>
+        Conformément au Règlement Général sur la Protection des Données (RGPD) — Règlement (UE)
+        2016/679 — et à la loi Informatique et Libertés modifiée, vous disposez des droits
+        suivants concernant vos données personnelles :
+      </p>
+      <ul>
+        <li>Droit d'accès</li>
+        <li>Droit de rectification</li>
+        <li>Droit à l'effacement (droit à l'oubli)</li>
+        <li>Droit à la limitation du traitement</li>
+        <li>Droit à la portabilité des données</li>
+        <li>Droit d'opposition</li>
+      </ul>
+      <p>
+        Pour exercer ces droits, vous pouvez contacter notre équipe à l'adresse suivante :{' '}
+        <a href={`mailto:contact@${config.domain}`}>contact@{config.domain}</a>.
+      </p>
+      <p>
+        Les données collectées (notamment via le formulaire d'inscription à la newsletter) sont
+        utilisées uniquement à des fins d'envoi d'informations éditoriales. Elles ne sont pas
+        transmises à des tiers à des fins commerciales.
+      </p>
+
+      <h2>5. Cookies</h2>
+      <p>
+        Ce site peut utiliser des cookies à des fins analytiques (mesure d'audience) via des
+        outils respectueux de la vie privée. Aucun cookie publicitaire tiers n'est déposé sans
+        votre consentement explicite.
+      </p>
+      <p>
+        Vous pouvez à tout moment configurer votre navigateur pour refuser les cookies ou être
+        informé de leur dépôt. Cela peut affecter certaines fonctionnalités du site.
+      </p>
+
+      <h2>6. Liens d'affiliation</h2>
+      <p>
+        {config.name} participe à des programmes d'affiliation. Certains liens présents sur ce site
+        sont des liens d'affiliation, ce qui signifie que si vous cliquez sur un lien et effectuez
+        un achat, nous pouvons percevoir une commission — sans coût supplémentaire pour vous.
+      </p>
+      <p>
+        Ces partenariats commerciaux n'influencent en aucun cas nos recommandations éditoriales.
+        Nous nous engageons à ne mentionner que des produits et services que nous considérons
+        utiles et pertinents pour nos lecteurs.
+      </p>
+      <p>
+        Conformément à la réglementation en vigueur, tous les liens d'affiliation sont
+        identifiables et déclarés de manière transparente.
+      </p>
+
+      <h2>7. Limitation de responsabilité</h2>
+      <p>
+        {config.name} s'efforce de fournir des informations exactes et à jour. Toutefois, nous ne
+        pouvons garantir l'exactitude, la complétude ou l'actualité des informations publiées.
+        L'utilisation des informations contenues sur ce site se fait sous la responsabilité
+        exclusive de l'utilisateur.
+      </p>
+      <p>
+        {config.name} ne saurait être tenu responsable des dommages directs ou indirects résultant
+        de l'utilisation de ce site ou des sites tiers auxquels il renvoie.
+      </p>
+
+      <h2>8. Droit applicable</h2>
+      <p>
+        Les présentes mentions légales sont régies par le droit français. En cas de litige, et à
+        défaut de résolution amiable, les tribunaux français seront seuls compétents.
+      </p>
+    </article>
+  </div>
+</BaseLayout>

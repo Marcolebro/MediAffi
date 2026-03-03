@@ -1,0 +1,25 @@
+---
+import { config } from "../lib/config";
+
+interface Props {
+  slot?: string;
+  format?: string;
+}
+
+const { slot, format = "auto" } = Astro.props;
+---
+
+{config.ads.adsense_id && (
+  <div class="my-6">
+    <p class="mb-1 text-center text-xs text-gray-400">Publicité</p>
+    <ins
+      class="adsbygoogle"
+      style="display:block"
+      data-ad-client={config.ads.adsense_id}
+      data-ad-slot={slot}
+      data-ad-format={format}
+      data-full-width-responsive="true"
+    />
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+)}

@@ -1,0 +1,45 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  buttonText?: string;
+  url: string;
+}
+
+const {
+  title,
+  description,
+  buttonText = "Découvrir l'offre →",
+  url,
+} = Astro.props;
+---
+
+<div
+  class="rounded-lg border border-gray-200 p-6"
+  style="background-color: color-mix(in srgb, var(--color-primary) 5%, transparent); border-left: 4px solid var(--color-accent);"
+>
+  <h3
+    class="text-lg font-bold"
+    style="color: var(--color-primary);"
+  >
+    {title}
+  </h3>
+
+  {
+    description && (
+      <p class="mt-2 text-gray-600">
+        {description}
+      </p>
+    )
+  }
+
+  <a
+    href={url}
+    rel="nofollow sponsored"
+    target="_blank"
+    class="mt-4 inline-block rounded-lg px-6 py-3 font-semibold text-white transition-shadow hover:shadow-md"
+    style="background-color: var(--color-accent);"
+  >
+    {buttonText}
+  </a>
+</div>

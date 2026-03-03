@@ -1,0 +1,97 @@
+---
+import { getCollection } from 'astro:content';
+import { config } from '../lib/config';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import NewsletterForm from '../components/NewsletterForm.astro';
+
+const allArticles = await getCollection('articles');
+
+const sortedArticles = allArticles.sort(
+  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
+
+const latestArticles = sortedArticles.slice(0, 6);
+
+const categories = config.categories;
+---
+
+<BaseLayout title={config.name} description={config.description}>
+  <!-- Hero section -->
+  <section
+    class="py-20 text-center text-white"
+    style="background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, transparent));"
+  >
+    <div class="max-w-4xl mx-auto px-4">
+      <h1 class="text-4xl md:text-5xl font-bold leading-tight">
+        {config.name}
+      </h1>
+      <p class="mt-4 text-xl" style="color: rgba(255,255,255,0.8);">
+        {config.tagline}
+      </p>
+      <a
+        href="#articles"
+        class="inline-block mt-8 px-8 py-4 rounded-lg font-semibold text-lg text-white transition-opacity hover:opacity-90"
+        style="background-color: var(--color-accent);"
+      >
+        Découvrir nos articles →
+      </a>
+    </div>
+  </section>
+
+  <!-- Latest articles section -->
+  <section id="articles" class="max-w-7xl mx-auto px-4 py-16">
+    <h2 class="text-3xl font-bold text-gray-900 mb-10">Derniers articles</h2>
+
+    {latestArticles.length > 0 ? (
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {latestArticles.map((article) => (
+          <ArticleCard
+            title={article.data.title}
+            slug={article.id}
+            date={article.data.date}
+            category={article.data.category}
+            type={article.data.type}
+            image={article.data.image}
+            meta_description={article.data.meta_description}
+          />
+        ))}
+      </div>
+    ) : (
+      <p class="text-gray-500 italic">Aucun article disponible pour le moment.</p>
+    )}
+  </section>
+
+  <!-- Categories section -->
+  {categories.length > 0 && (
+    <section class="bg-gray-50 py-16">
+      <div class="max-w-7xl mx-auto px-4">
+        <h2 class="text-3xl font-bold text-gray-900 mb-10">Nos catégories</h2>
+
+        <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {categories.map((cat) => (
+            <a
+              href={`/categorie/${cat.slug}`}
+              class="block bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200 group"
+            >
+              <h3
+                class="font-semibold text-lg mb-2 transition-colors duration-150 group-hover:text-[var(--color-primary)]"
+                style="color: var(--color-primary);"
+              >
+                {cat.name}
+              </h3>
+              <p class="text-sm text-gray-600 line-clamp-3">{cat.description}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Newsletter section -->
+  <section class="py-16">
+    <div class="max-w-2xl mx-auto px-4">
+      <NewsletterForm />
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,95 @@
+---
+interface Product {
+  name: string;
+  rating: number;
+  price: string;
+  features: string[];
+  url: string;
+}
+
+interface Props {
+  products: Product[];
+}
+
+const { products } = Astro.props;
+
+function getRatingColor(rating: number): string {
+  if (rating >= 8) return "bg-green-100 text-green-800";
+  if (rating >= 6) return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
+}
+---
+
+<div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+  <table class="min-w-full divide-y divide-gray-200">
+    <thead>
+      <tr style="background-color: var(--color-primary);">
+        <th
+          scope="col"
+          class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white"
+        >
+          Produit
+        </th>
+        <th
+          scope="col"
+          class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white"
+        >
+          Note
+        </th>
+        <th
+          scope="col"
+          class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white"
+        >
+          Prix
+        </th>
+        <th
+          scope="col"
+          class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white"
+        >
+          Fonctionnalités
+        </th>
+        <th
+          scope="col"
+          class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white"
+        >
+          Action
+        </th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 bg-white">
+      {
+        products.map((product, index) => (
+          <tr class={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+            <td class="whitespace-nowrap px-4 py-4 font-medium text-gray-900">
+              {product.name}
+            </td>
+            <td class="whitespace-nowrap px-4 py-4">
+              <span
+                class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-semibold ${getRatingColor(product.rating)}`}
+              >
+                {product.rating}/10
+              </span>
+            </td>
+            <td class="whitespace-nowrap px-4 py-4 font-semibold text-gray-900">
+              {product.price}
+            </td>
+            <td class="px-4 py-4 text-sm text-gray-600">
+              {product.features.join(", ")}
+            </td>
+            <td class="whitespace-nowrap px-4 py-4">
+              <a
+                href={product.url}
+                rel="nofollow sponsored"
+                target="_blank"
+                class="inline-flex items-center rounded px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                style="background-color: var(--color-accent);"
+              >
+                Voir l'offre
+              </a>
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

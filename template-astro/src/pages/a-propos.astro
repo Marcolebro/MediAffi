@@ -1,0 +1,54 @@
+---
+import { config } from '../lib/config';
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="À propos"
+  description={`En savoir plus sur ${config.name} — notre mission, notre équipe et notre méthodologie.`}
+>
+  <div class="max-w-3xl mx-auto px-4 py-16">
+    <article class="prose prose-gray max-w-none">
+      <h1>À propos de {config.name}</h1>
+
+      <h2>Notre mission</h2>
+      <p>
+        {config.name} est un site d'information indépendant dédié à vous aider à faire les meilleurs
+        choix. {config.description}
+      </p>
+      <p>
+        Dans un monde saturé d'informations, notre ambition est simple : vous fournir des contenus
+        clairs, objectifs et vérifiés pour vous accompagner dans vos décisions au quotidien.
+      </p>
+
+      <h2>Ce que nous faisons</h2>
+      <p>
+        Nous rédigeons des guides pratiques, des comparatifs approfondis, des avis détaillés et des
+        analyses de tendances. Chaque contenu est produit avec rigueur et mis à jour régulièrement
+        pour rester pertinent.
+      </p>
+      <p>
+        Notre processus éditorial repose sur une collecte d'informations multi-sources, une
+        vérification systématique des données et une rédaction accessible à tous.
+      </p>
+
+      <h2>Notre indépendance éditoriale</h2>
+      <p>
+        Certains articles contiennent des liens d'affiliation. Cela signifie que nous pouvons
+        percevoir une commission si vous effectuez un achat via ces liens — sans coût supplémentaire
+        pour vous. Ces partenariats ne influencent jamais nos recommandations ni notre jugement
+        éditorial.
+      </p>
+      <p>
+        Nous nous engageons à ne recommander que des produits et services que nous estimons
+        réellement utiles pour nos lecteurs.
+      </p>
+
+      <h2>Nous contacter</h2>
+      <p>
+        Une question, une suggestion ou un partenariat ? Rendez-vous sur notre{' '}
+        <a href="/contact">page de contact</a>.
+      </p>
+    </article>
+  </div>
+</BaseLayout>

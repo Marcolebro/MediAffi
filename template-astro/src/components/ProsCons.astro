@@ -1,0 +1,98 @@
+---
+interface Props {
+  pros: string[];
+  cons: string[];
+}
+
+const { pros, cons } = Astro.props;
+---
+
+<div class="rounded-lg border border-gray-200 overflow-hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+
+    <!-- Avantages (Pros) -->
+    <div>
+      <div class="bg-green-50 px-4 py-3 border-b border-green-100">
+        <h3 class="flex items-center gap-2 font-semibold text-green-800">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-green-600"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          Avantages
+        </h3>
+      </div>
+      <ul class="divide-y divide-dashed divide-gray-200 px-4 py-2 bg-white">
+        {
+          pros.map((pro) => (
+            <li class="flex items-start gap-2 py-2 text-sm text-gray-700 last:border-0">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="mt-0.5 h-4 w-4 shrink-0 text-green-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              {pro}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <!-- Inconvénients (Cons) -->
+    <div>
+      <div class="bg-red-50 px-4 py-3 border-b border-red-100">
+        <h3 class="flex items-center gap-2 font-semibold text-red-800">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-red-500"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          Inconvénients
+        </h3>
+      </div>
+      <ul class="divide-y divide-dashed divide-gray-200 px-4 py-2 bg-white">
+        {
+          cons.map((con) => (
+            <li class="flex items-start gap-2 py-2 text-sm text-gray-700 last:border-0">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="mt-0.5 h-4 w-4 shrink-0 text-red-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              {con}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+  </div>
+</div>

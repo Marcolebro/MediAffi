@@ -1,0 +1,188 @@
+---
+import { config } from '../lib/config';
+
+const currentYear = new Date().getFullYear();
+const shortDescription = config.description.slice(0, 100);
+
+// Social links — only include those with a non-empty value
+const socialLinks = [
+  { label: 'Twitter / X', href: config.social.twitter ? `https://twitter.com/${config.social.twitter}` : '' },
+  { label: 'LinkedIn', href: config.social.linkedin ? `https://linkedin.com/company/${config.social.linkedin}` : '' },
+  { label: 'Instagram', href: config.social.instagram ? `https://instagram.com/${config.social.instagram}` : '' },
+].filter((s) => s.href !== '');
+---
+
+<footer class="footer">
+  <div class="footer__inner">
+    <!-- Grid -->
+    <div class="footer__grid">
+
+      <!-- Col 1 — Brand + description + social -->
+      <div class="footer__col footer__col--brand">
+        <a href="/" class="footer__brand-name">{config.name}</a>
+        <p class="footer__description">
+          {shortDescription}{config.description.length > 100 ? '…' : ''}
+        </p>
+        {socialLinks.length > 0 && (
+          <div class="footer__social">
+            {socialLinks.map((s) => (
+              <a
+                href={s.href}
+                class="footer__social-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={s.label}
+              >
+                {s.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Col 2 — Navigation -->
+      <div class="footer__col">
+        <h3 class="footer__heading">Navigation</h3>
+        <ul class="footer__link-list" role="list">
+          {config.nav_links.map((link) => (
+            <li>
+              <a href={link.href} class="footer__link">{link.label}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Col 3 — Informations -->
+      <div class="footer__col">
+        <h3 class="footer__heading">Informations</h3>
+        <ul class="footer__link-list" role="list">
+          {config.footer_links.map((link) => (
+            <li>
+              <a href={link.href} class="footer__link">{link.label}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="footer__bottom">
+      <p class="footer__copyright">
+        &copy; {currentYear} {config.name}. Tous droits réservés.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    background-color: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    margin-top: auto;
+  }
+
+  .footer__inner {
+    max-width: 80rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+    padding-block: 3rem 0;
+  }
+
+  .footer__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .footer__grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3rem;
+    }
+  }
+
+  /* Brand column */
+  .footer__brand-name {
+    display: inline-block;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-primary, #1e3a5f);
+    text-decoration: none;
+    margin-bottom: 0.75rem;
+  }
+
+  .footer__brand-name:hover {
+    opacity: 0.85;
+  }
+
+  .footer__description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    line-height: 1.6;
+    max-width: 28ch;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Social links */
+  .footer__social {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .footer__social-link {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .footer__social-link:hover {
+    color: var(--color-accent, #e67e22);
+  }
+
+  /* Nav / info columns */
+  .footer__heading {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #111827;
+    margin-bottom: 1rem;
+  }
+
+  .footer__link-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .footer__link {
+    font-size: 0.9375rem;
+    color: #4b5563;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .footer__link:hover {
+    color: var(--color-accent, #e67e22);
+  }
+
+  /* Bottom bar */
+  .footer__bottom {
+    margin-top: 2.5rem;
+    padding-block: 1.25rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .footer__copyright {
+    font-size: 0.8125rem;
+    color: #9ca3af;
+    text-align: center;
+  }
+</style>
