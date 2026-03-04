@@ -67,9 +67,17 @@ export async function POST(request: Request) {
         fileMap.set(f.path, f);
       }
 
-      // Overlay generated files
+      // Overlay generated files (filter invalid entries)
       if (generatedFiles?.files) {
         for (const gf of generatedFiles.files) {
+          if (!gf.path || typeof gf.path !== "string" || !gf.path.trim()) {
+            send({ step: "github", status: "progress", message: `Fichier ignoré: path vide` });
+            continue;
+          }
+          if (!gf.content || typeof gf.content !== "string" || !gf.content.trim()) {
+            send({ step: "github", status: "progress", message: `Fichier ignoré (contenu vide): ${gf.path}` });
+            continue;
+          }
           fileMap.set(gf.path, {
             path: gf.path,
             content: Buffer.from(gf.content).toString("base64"),
@@ -96,6 +104,13 @@ export async function POST(request: Request) {
         ref: "heads/main",
       });
       const parentSha = ref.object.sha;
+
+      // Filter out any remaining invalid entries from fileMap
+      for (const [key, file] of fileMap.entries()) {
+        if (!file.path?.trim() || !file.content?.trim()) {
+          fileMap.delete(key);
+        }
+      }
 
       // Create blobs
       const treeItems: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];

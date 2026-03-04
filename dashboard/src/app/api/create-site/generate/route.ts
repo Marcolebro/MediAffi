@@ -15,7 +15,7 @@ import {
 import { createNDJSONStream, type StepEvent } from "../shared";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 type GenerateBody = {
   siteId: string;
