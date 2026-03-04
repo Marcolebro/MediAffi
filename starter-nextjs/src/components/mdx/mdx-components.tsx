@@ -16,31 +16,8 @@ import { FeatureGrid } from "@/components/business/FeatureGrid";
 import { StepGuide } from "@/components/business/StepGuide";
 import { TestimonialCard } from "@/components/business/TestimonialCard";
 import { AdSlot } from "@/components/ads/AdSlot";
-
-// Stub for client components not yet built (Phase 4C)
-function createStub(name: string) {
-  return function StubComponent(props: Record<string, unknown>) {
-    return (
-      <div
-        style={{
-          border: "1px dashed #666",
-          padding: "1rem",
-          margin: "1rem 0",
-          borderRadius: "0.5rem",
-          fontSize: "0.875rem",
-          color: "#888",
-        }}
-      >
-        <strong>[{name}]</strong>
-        {Object.keys(props).length > 0 && (
-          <pre style={{ fontSize: "0.75rem", marginTop: "0.5rem" }}>
-            {JSON.stringify(props, null, 2)}
-          </pre>
-        )}
-      </div>
-    );
-  };
-}
+import { NewsletterForm } from "@/components/ui/NewsletterForm";
+import { ShareButtons } from "@/components/ui/ShareButtons";
 
 export function getMdxComponents(): MDXComponents {
   return {
@@ -61,9 +38,9 @@ export function getMdxComponents(): MDXComponents {
     TestimonialCard,
     AdSlot,
 
-    // Client components (stubs until Phase 4C)
-    NewsletterForm: createStub("NewsletterForm"),
-    ShareButtons: createStub("ShareButtons"),
+    // Client components
+    NewsletterForm,
+    ShareButtons,
 
     // HTML overrides
     h1: (props) => (
