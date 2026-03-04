@@ -42,12 +42,18 @@ export async function POST(request: Request) {
     let vercelUrl = "";
     let vercelProjectName = "";
 
+    // Shared across steps
+    let octokit: Octokit | null = null;
+    let ghRepoOwner = "";
+    let ghRepoName = "";
+    let lastCommitSha = "";
+
     // Step 1 — GitHub: push starter + generated files
     const githubToken = process.env.GITHUB_TOKEN;
     try {
       if (!githubToken) throw new Error("GITHUB_TOKEN is not configured");
 
-      const octokit = new Octokit({ auth: githubToken });
+      octokit = new Octokit({ auth: githubToken });
 
       // Create empty repo
       const { data: repo } = await octokit.rest.repos.createForAuthenticatedUser({
@@ -56,6 +62,8 @@ export async function POST(request: Request) {
         private: false,
       });
       repoUrl = repo.html_url;
+      ghRepoOwner = repo.owner.login;
+      ghRepoName = repo.name;
 
       // Read starter-nextjs files
       const starterDir = path.resolve(process.cwd(), "..", "starter-nextjs");
@@ -95,12 +103,9 @@ export async function POST(request: Request) {
       }
 
       // Push everything via Git Data API
-      const repoOwner = repo.owner.login;
-      const repoName = repo.name;
-
       const { data: ref } = await octokit.rest.git.getRef({
-        owner: repoOwner,
-        repo: repoName,
+        owner: ghRepoOwner,
+        repo: ghRepoName,
         ref: "heads/main",
       });
       const parentSha = ref.object.sha;
@@ -116,8 +121,8 @@ export async function POST(request: Request) {
       const treeItems: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
       for (const file of fileMap.values()) {
         const { data: blob } = await octokit.rest.git.createBlob({
-          owner: repoOwner,
-          repo: repoName,
+          owner: ghRepoOwner,
+          repo: ghRepoName,
           content: file.content,
           encoding: file.encoding,
         });
@@ -131,25 +136,27 @@ export async function POST(request: Request) {
 
       // Create tree, commit, update ref
       const { data: tree } = await octokit.rest.git.createTree({
-        owner: repoOwner,
-        repo: repoName,
+        owner: ghRepoOwner,
+        repo: ghRepoName,
         tree: treeItems,
       });
 
       const { data: commit } = await octokit.rest.git.createCommit({
-        owner: repoOwner,
-        repo: repoName,
+        owner: ghRepoOwner,
+        repo: ghRepoName,
         message: "chore: initialize from starter-nextjs + AI-generated code",
         tree: tree.sha,
         parents: [parentSha],
       });
 
       await octokit.rest.git.updateRef({
-        owner: repoOwner,
-        repo: repoName,
+        owner: ghRepoOwner,
+        repo: ghRepoName,
         ref: "heads/main",
         sha: commit.sha,
       });
+
+      lastCommitSha = commit.sha;
 
       send({ step: "github", status: "done", repoUrl });
     } catch (err) {
@@ -166,8 +173,7 @@ export async function POST(request: Request) {
       if (!vercelToken) throw new Error("VERCEL_TOKEN is not configured");
       if (!repoUrl) throw new Error("Skipped: GitHub repo not created");
 
-      const repoOwner = repoUrl.split("/").slice(-2, -1)[0];
-      const repoFullName = `${repoOwner}/${slug.trim()}`;
+      const repoFullName = `${ghRepoOwner}/${ghRepoName}`;
 
       const createRes = await fetch("https://api.vercel.com/v10/projects", {
         method: "POST",
@@ -208,27 +214,32 @@ export async function POST(request: Request) {
         body: JSON.stringify(envVars),
       }).catch(() => {});
 
-      // Trigger deployment manually (don't rely on GitHub webhook)
-      const deployRes = await fetch("https://api.vercel.com/v13/deployments", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: vercelProjectName,
-          project: project.id,
-          gitSource: {
-            type: "github",
-            repo: repoFullName,
-            ref: "main",
-          },
-        }),
-      });
+      // Trigger deployment by pushing an empty commit (same tree, new commit)
+      if (octokit && lastCommitSha) {
+        try {
+          const { data: lastCommit } = await octokit.rest.git.getCommit({
+            owner: ghRepoOwner,
+            repo: ghRepoName,
+            commit_sha: lastCommitSha,
+          });
 
-      if (!deployRes.ok) {
-        const errData = await deployRes.json().catch(() => ({}));
-        send({ step: "vercel", status: "progress", message: `Deployment trigger warning: ${JSON.stringify(errData)}` });
+          const { data: emptyCommit } = await octokit.rest.git.createCommit({
+            owner: ghRepoOwner,
+            repo: ghRepoName,
+            message: "Initial deployment trigger",
+            tree: lastCommit.tree.sha,
+            parents: [lastCommitSha],
+          });
+
+          await octokit.rest.git.updateRef({
+            owner: ghRepoOwner,
+            repo: ghRepoName,
+            ref: "heads/main",
+            sha: emptyCommit.sha,
+          });
+        } catch (triggerErr) {
+          send({ step: "vercel", status: "progress", message: `Deploy trigger warning: ${triggerErr instanceof Error ? triggerErr.message : "unknown"}` });
+        }
       }
 
       send({
