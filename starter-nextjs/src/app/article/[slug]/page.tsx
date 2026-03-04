@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getArticleBySlug, getAllArticles } from "@/lib/content";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { MDXRenderer } from "@/components/mdx/MDXRenderer";
+import { ArticleLayout } from "@/components/content/ArticleLayout";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import { buildMetadata } from "@/components/seo/OpenGraph";
+import config from "@/lib/config";
 
 export function generateStaticParams() {
   const articles = getAllArticles();
@@ -19,10 +20,14 @@ export async function generateMetadata({
   const article = getArticleBySlug(slug);
   if (!article) return {};
 
-  return {
+  return buildMetadata({
     title: article.title,
     description: article.meta_description,
-  };
+    path: `/article/${slug}`,
+    type: "article",
+    publishedTime: article.date,
+    author: article.author,
+  });
 }
 
 export default async function ArticlePage({
@@ -37,34 +42,36 @@ export default async function ArticlePage({
     notFound();
   }
 
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": article.type === "review" ? "Review" : "Article",
+    headline: article.title,
+    datePublished: article.date,
+    author: {
+      "@type": "Person",
+      name: article.author ?? config.name,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: config.name,
+      url: `https://${config.domain}`,
+    },
+    description: article.meta_description,
+    ...(article.type === "review" && article.rating
+      ? {
+          reviewRating: {
+            "@type": "Rating",
+            ratingValue: article.rating,
+            bestRating: 10,
+          },
+        }
+      : {}),
+  };
+
   return (
     <>
-      <Header />
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-        <article>
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {article.title}
-            </h1>
-            {article.date && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                {new Date(article.date).toLocaleDateString("fr-FR", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            )}
-            {article.category && (
-              <span className="mt-2 inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                {article.category}
-              </span>
-            )}
-          </header>
-          <MDXRenderer source={article.content} />
-        </article>
-      </main>
-      <Footer />
+      <SchemaOrg schema={articleSchema} />
+      <ArticleLayout article={article} />
     </>
   );
 }

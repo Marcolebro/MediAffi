@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import config, { getSiteColorStyle } from "@/lib/config";
+import { SchemaOrg } from "@/components/seo/SchemaOrg";
+import adsConfig from "../../site-data/ads.json";
 import "@/styles/globals.css";
 
 const inter = Inter({
@@ -39,6 +41,35 @@ export default function RootLayout({
           {children}
           <Toaster />
         </ThemeProvider>
+
+        {/* Schema.org WebSite */}
+        <SchemaOrg
+          schema={{
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: config.name,
+            url: `https://${config.domain}`,
+            description: config.description,
+          }}
+        />
+
+        {/* Plausible Analytics */}
+        {config.analytics?.plausible_domain && (
+          <script
+            defer
+            data-domain={config.analytics.plausible_domain}
+            src="https://plausible.io/js/script.js"
+          />
+        )}
+
+        {/* AdSense */}
+        {adsConfig.adsense_id && (
+          <script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsConfig.adsense_id}`}
+            crossOrigin="anonymous"
+          />
+        )}
       </body>
     </html>
   );

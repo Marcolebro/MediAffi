@@ -4,6 +4,8 @@ import { getPageContent } from "@/lib/content";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MDXRenderer } from "@/components/mdx/MDXRenderer";
+import { Breadcrumb } from "@/components/seo/Breadcrumb";
+import { buildMetadata } from "@/components/seo/OpenGraph";
 import pagesConfig from "../../../site-data/pages-config.json";
 
 const pages = pagesConfig.pages.filter((p) => p.slug !== "homepage");
@@ -21,13 +23,11 @@ export async function generateMetadata({
   const page = getPageContent(slug);
   if (!page) return {};
 
-  const title = (page.frontmatter.title as string) ?? slug;
-  const description = page.frontmatter.description as string | undefined;
-
-  return {
-    title,
-    description,
-  };
+  return buildMetadata({
+    title: (page.frontmatter.title as string) ?? slug,
+    description: page.frontmatter.description as string | undefined,
+    path: `/${slug}`,
+  });
 }
 
 export default async function SlugPage({
@@ -46,6 +46,9 @@ export default async function SlugPage({
     <>
       <Header />
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+        <Breadcrumb
+          items={[{ label: (page.frontmatter.title as string) ?? slug }]}
+        />
         <MDXRenderer source={page.content} />
       </main>
       <Footer />
