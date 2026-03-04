@@ -1,6 +1,23 @@
 import type { MDXComponents } from "mdx/types";
 
-// Stub component factory - renders a placeholder div showing the component name and props
+// Business components
+import { HeroBanner } from "@/components/business/HeroBanner";
+import { RankingTable } from "@/components/business/RankingTable";
+import { ProductCard } from "@/components/business/ProductCard";
+import { BonusCard } from "@/components/business/BonusCard";
+import { BonusGrid } from "@/components/business/BonusGrid";
+import { ComparisonTable } from "@/components/business/ComparisonTable";
+import { PricingTable } from "@/components/business/PricingTable";
+import { CTABox } from "@/components/business/CTABox";
+import { FAQ } from "@/components/business/FAQ";
+import { Rating } from "@/components/business/Rating";
+import { ProsCons } from "@/components/business/ProsCons";
+import { FeatureGrid } from "@/components/business/FeatureGrid";
+import { StepGuide } from "@/components/business/StepGuide";
+import { TestimonialCard } from "@/components/business/TestimonialCard";
+import { AdSlot } from "@/components/ads/AdSlot";
+
+// Stub for client components not yet built (Phase 4C)
 function createStub(name: string) {
   return function StubComponent(props: Record<string, unknown>) {
     return (
@@ -27,22 +44,24 @@ function createStub(name: string) {
 
 export function getMdxComponents(): MDXComponents {
   return {
-    // Business components (stubs — will be replaced in Phase 3E)
-    HeroBanner: createStub("HeroBanner"),
-    RankingTable: createStub("RankingTable"),
-    ProductCard: createStub("ProductCard"),
-    BonusCard: createStub("BonusCard"),
-    BonusGrid: createStub("BonusGrid"),
-    ComparisonTable: createStub("ComparisonTable"),
-    PricingTable: createStub("PricingTable"),
-    CTABox: createStub("CTABox"),
-    FAQ: createStub("FAQ"),
-    Rating: createStub("Rating"),
-    ProsCons: createStub("ProsCons"),
-    FeatureGrid: createStub("FeatureGrid"),
-    StepGuide: createStub("StepGuide"),
-    TestimonialCard: createStub("TestimonialCard"),
-    AdSlot: createStub("AdSlot"),
+    // Business components
+    HeroBanner,
+    RankingTable,
+    ProductCard,
+    BonusCard,
+    BonusGrid,
+    ComparisonTable,
+    PricingTable,
+    CTABox,
+    FAQ,
+    Rating,
+    ProsCons,
+    FeatureGrid,
+    StepGuide,
+    TestimonialCard,
+    AdSlot,
+
+    // Client components (stubs until Phase 4C)
     NewsletterForm: createStub("NewsletterForm"),
     ShareButtons: createStub("ShareButtons"),
 
@@ -53,14 +72,28 @@ export function getMdxComponents(): MDXComponents {
     h2: (props) => (
       <h2
         className="mt-8 mb-3 text-2xl font-semibold tracking-tight"
-        id={typeof props.children === "string" ? props.children.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "") : undefined}
+        id={
+          typeof props.children === "string"
+            ? props.children
+                .toLowerCase()
+                .replace(/\s+/g, "-")
+                .replace(/[^\w-]/g, "")
+            : undefined
+        }
         {...props}
       />
     ),
     h3: (props) => (
       <h3
         className="mt-6 mb-2 text-xl font-semibold"
-        id={typeof props.children === "string" ? props.children.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "") : undefined}
+        id={
+          typeof props.children === "string"
+            ? props.children
+                .toLowerCase()
+                .replace(/\s+/g, "-")
+                .replace(/[^\w-]/g, "")
+            : undefined
+        }
         {...props}
       />
     ),
