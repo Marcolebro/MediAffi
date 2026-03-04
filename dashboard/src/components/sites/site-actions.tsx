@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +15,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ExternalLink,
@@ -25,6 +37,7 @@ import {
   Settings,
   Loader2,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import type { Site } from "@/lib/types/database";
 
@@ -33,10 +46,13 @@ type Props = {
 };
 
 export function SiteActions({ site }: Props) {
+  const router = useRouter();
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [addPageOpen, setAddPageOpen] = useState(false);
   const [pagePrompt, setPagePrompt] = useState("");
   const [addPageLoading, setAddPageLoading] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleRunPipeline() {
     setPipelineLoading(true);
@@ -128,6 +144,26 @@ export function SiteActions({ site }: Props) {
       toast.success("Redéploiement lancé !");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/sites/${site.id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Erreur");
+      if (result.warnings?.length > 0) {
+        toast.warning(`Site supprimé avec avertissements: ${result.warnings.join(", ")}`);
+      } else {
+        toast.success("Site supprimé avec succès");
+      }
+      router.push("/sites");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la suppression");
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
     }
   }
 
@@ -226,8 +262,46 @@ export function SiteActions({ site }: Props) {
             <RotateCcw className="mr-2 h-4 w-4" />
             Forcer le redéploiement
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Supprimer le site
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {site.name} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le site sera supprimé de la base de données,
+              le repository GitHub et le projet Vercel seront également supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

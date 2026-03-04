@@ -2,8 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSiteById } from "@/lib/queries/sites";
 import { updateQueueItem } from "@/lib/queries/queue";
 import { Octokit } from "octokit";
+import { callAI, getPreferredModel } from "@/lib/ai";
 import {
-  callGemini,
   ARTICLE_WRITE_SYSTEM_PROMPT,
   buildArticleWritePrompt,
 } from "@/lib/gemini";
@@ -81,20 +81,23 @@ export async function POST(request: Request) {
         // Update status to processing
         await updateQueueItem(supabase, queueItem.id, { status: "writing" });
 
-        // Generate article with Gemini
+        // Generate article with AI
         let mdxContent: string;
         try {
           const slug = slugify(queueItem.keyword);
-          mdxContent = await callGemini(
-            ARTICLE_WRITE_SYSTEM_PROMPT,
-            buildArticleWritePrompt(
+          const model = await getPreferredModel(supabase, "article");
+          const result = await callAI({
+            prompt: buildArticleWritePrompt(
               site.name,
               queueItem.keyword,
               queueItem.type || "article",
               queueItem.secondary_keywords || [queueItem.keyword]
             ),
-            { maxOutputTokens: 16000 }
-          );
+            systemPrompt: ARTICLE_WRITE_SYSTEM_PROMPT,
+            model,
+            maxTokens: 16000,
+          });
+          mdxContent = result.text;
 
           // Strip markdown fences if present
           mdxContent = mdxContent

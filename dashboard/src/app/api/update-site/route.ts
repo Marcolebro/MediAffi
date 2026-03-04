@@ -1,10 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSiteById, updateSite } from "@/lib/queries/sites";
 import { Octokit } from "octokit";
-import {
-  callGeminiJSON,
-  getSystemPromptForGeneration,
-} from "@/lib/gemini";
+import { callAIJSON, getPreferredModel } from "@/lib/ai";
+import { getSystemPromptForGeneration } from "@/lib/gemini";
 
 export const runtime = "nodejs";
 
@@ -58,16 +56,19 @@ export async function POST(request: Request) {
         const [owner, repo] = site.github_repo.split("/");
         const prompt = (data.prompt as string) || "";
 
-        // Generate a single page with Gemini
+        // Generate a single page with AI
         const systemPrompt = getSystemPromptForGeneration("libre");
-        const pageResult = await callGeminiJSON<{
+        const model = await getPreferredModel(supabase, "site");
+        const pageResult = await callAIJSON<{
           files: { path: string; content: string }[];
           dependencies: string[];
-        }>(
+        }>({
+          prompt: `Génère UNE SEULE page React/Next.js pour le site "${site.name}". Description : ${prompt}. Retourne le JSON avec les fichiers nécessaires (page + composants utilisés).`,
           systemPrompt,
-          `Génère UNE SEULE page React/Next.js pour le site "${site.name}". Description : ${prompt}. Retourne le JSON avec les fichiers nécessaires (page + composants utilisés).`,
-          { maxOutputTokens: 16000, retries: 3 }
-        );
+          model,
+          maxTokens: 16000,
+          retries: 3,
+        });
 
         // Push each generated file
         for (const file of pageResult.files || []) {

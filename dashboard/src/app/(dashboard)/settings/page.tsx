@@ -15,7 +15,50 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
+
+type ProviderKeys = { gemini: boolean; anthropic: boolean; moonshot: boolean; openai: boolean };
+
+type AIModel = {
+  id: string;
+  label: string;
+  provider: "gemini" | "anthropic" | "moonshot" | "openai";
+};
+
+const ALL_MODELS: AIModel[] = [
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "gemini" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "gemini" },
+  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash (Preview)", provider: "gemini" },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)", provider: "gemini" },
+  { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", provider: "anthropic" },
+  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "anthropic" },
+  { id: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "anthropic" },
+  { id: "kimi-k2.5", label: "Kimi K2.5", provider: "moonshot" },
+  { id: "gpt-4o", label: "GPT-4o", provider: "openai" },
+];
+
+const PROVIDER_LABELS: Record<string, string> = {
+  gemini: "Google Gemini",
+  anthropic: "Anthropic",
+  moonshot: "Moonshot",
+  openai: "OpenAI",
+};
+
+const API_KEY_VARS = [
+  { provider: "gemini" as const, key: "GEMINI_API_KEY", label: "Gemini API Key" },
+  { provider: "anthropic" as const, key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
+  { provider: "moonshot" as const, key: "MOONSHOT_API_KEY", label: "Moonshot API Key" },
+  { provider: "openai" as const, key: "OPENAI_API_KEY", label: "OpenAI API Key" },
+];
 
 const ENV_VARS = [
   { key: "NEXT_PUBLIC_SUPABASE_URL", label: "Supabase URL" },
@@ -30,6 +73,12 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // AI settings state
+  const [providerKeys, setProviderKeys] = useState<ProviderKeys | null>(null);
+  const [siteModel, setSiteModel] = useState("gemini-2.5-flash");
+  const [articleModel, setArticleModel] = useState("gemini-2.5-flash");
+  const [savingAI, setSavingAI] = useState(false);
+
   useEffect(() => {
     async function loadUser() {
       const {
@@ -39,6 +88,22 @@ export default function SettingsPage() {
     }
     loadUser();
   }, [supabase]);
+
+  useEffect(() => {
+    async function loadAISettings() {
+      const [keysRes, settingsRes] = await Promise.all([
+        fetch("/api/settings/check-keys"),
+        fetch("/api/settings"),
+      ]);
+      if (keysRes.ok) setProviderKeys(await keysRes.json());
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        if (data.default_site_model) setSiteModel(data.default_site_model);
+        if (data.default_article_model) setArticleModel(data.default_article_model);
+      }
+    }
+    loadAISettings();
+  }, []);
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +143,62 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSaveAI() {
+    setSavingAI(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          default_site_model: siteModel,
+          default_article_model: articleModel,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success("Paramètres IA sauvegardés");
+    } catch {
+      toast.error("Erreur lors de la sauvegarde");
+    } finally {
+      setSavingAI(false);
+    }
+  }
+
+  function getAvailableModels(): AIModel[] {
+    if (!providerKeys) return [];
+    return ALL_MODELS.filter((m) => providerKeys[m.provider]);
+  }
+
+  function renderModelSelect(value: string, onChange: (v: string) => void, label: string) {
+    const models = getAvailableModels();
+    const grouped = models.reduce<Record<string, AIModel[]>>((acc, m) => {
+      (acc[m.provider] ??= []).push(m);
+      return acc;
+    }, {});
+
+    return (
+      <div className="space-y-2">
+        <Label>{label}</Label>
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(grouped).map(([provider, models]) => (
+              <SelectGroup key={provider}>
+                <SelectLabel>{PROVIDER_LABELS[provider] || provider}</SelectLabel>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
   }
 
   function isConfigured(key: string): boolean {
@@ -129,6 +250,67 @@ export default function SettingsPage() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* IA & API */}
+      <Card>
+        <CardHeader>
+          <CardTitle>IA & API</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* API Key Status */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Clés API configurées</Label>
+            {API_KEY_VARS.map((apiVar) => {
+              const configured = providerKeys?.[apiVar.provider] ?? false;
+              return (
+                <div
+                  key={apiVar.key}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{apiVar.label}</p>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {apiVar.key}
+                    </p>
+                  </div>
+                  {configured ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      <CheckCircle className="mr-1 h-3 w-3" />
+                      Configurée
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                      <XCircle className="mr-1 h-3 w-3" />
+                      Manquante
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <Separator />
+
+          {/* Model Selection */}
+          <div className="space-y-4">
+            {renderModelSelect(siteModel, setSiteModel, "Modèle génération de sites")}
+            {renderModelSelect(articleModel, setArticleModel, "Modèle rédaction d'articles")}
+          </div>
+
+          <Button onClick={handleSaveAI} disabled={savingAI}>
+            {savingAI ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sauvegarde...
+              </>
+            ) : (
+              "Sauvegarder"
+            )}
+          </Button>
         </CardContent>
       </Card>
 

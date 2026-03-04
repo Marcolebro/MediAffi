@@ -23,8 +23,17 @@ export type Site = {
   articles_per_day: number;
   auto_social: boolean;
   auto_newsletter: boolean;
+  generated_files: Record<string, unknown> | null;
+  creation_step: string | null;
   active: boolean;
   created_at: string;
+  updated_at: string;
+};
+
+export type AISettings = {
+  id: string;
+  default_site_model: string;
+  default_article_model: string;
   updated_at: string;
 };
 
@@ -225,6 +234,7 @@ export type Database = {
       newsletters: { Row: Newsletter; Insert: Partial<Newsletter> & Pick<Newsletter, "site_id" | "subject">; Update: Partial<Newsletter> };
       sponsors: { Row: Sponsor; Insert: Partial<Sponsor> & Pick<Sponsor, "site_id" | "name" | "content" | "link">; Update: Partial<Sponsor> };
       weekly_analysis: { Row: WeeklyAnalysis; Insert: Partial<WeeklyAnalysis> & Pick<WeeklyAnalysis, "site_id" | "week_start">; Update: Partial<WeeklyAnalysis> };
+      ai_settings: { Row: AISettings; Insert: Partial<AISettings>; Update: Partial<AISettings> };
     };
   };
 };

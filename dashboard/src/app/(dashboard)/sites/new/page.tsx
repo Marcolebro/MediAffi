@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ import {
   Globe,
   ChevronDown,
   Settings,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -98,14 +100,75 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+// ─── NDJSON stream reader helper ───
+
+async function streamEndpoint(
+  url: string,
+  body: unknown,
+  onEvent: (event: Record<string, unknown>) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+
+  // JSON response (non-streaming, e.g. init)
+  if (contentType.includes("application/json")) {
+    const data = await res.json();
+    onEvent(data);
+    return;
+  }
+
+  // NDJSON streaming
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response stream");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        onEvent(JSON.parse(line));
+      } catch {
+        // Skip malformed lines
+      }
+    }
+  }
+}
+
 export default function CreateSitePage() {
   const router = useRouter();
   const [mode, setMode] = useState<CreateMode>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Abort / cancel
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [aborted, setAborted] = useState(false);
+  const siteIdRef = useRef<string | null>(null);
+
   // Progress
   const [steps, setSteps] = useState<Step[]>([]);
+  const [failedStep, setFailedStep] = useState<string | null>(null);
   const [result, setResult] = useState<{
     siteId?: string;
     repoUrl?: string;
@@ -171,6 +234,73 @@ export default function CreateSitePage() {
     });
   }, []);
 
+  function handleStreamEvent(event: Record<string, unknown>) {
+    const step = event.step as string;
+    const status = event.status as string;
+
+    if (step === "complete" || step === "deploy_complete" || step === "generate_complete") {
+      // Accumulate result data
+      setResult((prev) => {
+        const next = { ...(prev || {}) };
+        if (event.siteId) next.siteId = event.siteId as string;
+        if (event.repoUrl) next.repoUrl = event.repoUrl as string;
+        if (event.siteUrl) next.siteUrl = event.siteUrl as string;
+        if (event.articlesQueued !== undefined) next.articlesQueued = event.articlesQueued as number;
+        return next;
+      });
+      return;
+    }
+
+    // Init response (JSON, not NDJSON)
+    if (event.siteId && !step) {
+      siteIdRef.current = event.siteId as string;
+      setResult((prev) => ({ ...prev, siteId: event.siteId as string }));
+      updateStepStatus("supabase", "done");
+      markNextInProgress("supabase");
+      return;
+    }
+
+    if (status === "done") {
+      updateStepStatus(step, "done");
+      markNextInProgress(step);
+    } else if (status === "error") {
+      updateStepStatus(step, "error", event.error as string);
+      markNextInProgress(step);
+    } else if (status === "progress") {
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.key === step
+            ? {
+                ...s,
+                status: "in_progress" as StepStatus,
+                detail: s.detail
+                  ? `${s.detail}, ${event.message}`
+                  : (event.message as string),
+              }
+            : s
+        )
+      );
+    }
+  }
+
+  async function handleCancel() {
+    setAborted(true);
+    abortControllerRef.current?.abort();
+
+    // Cleanup: delete the site if it was created
+    const siteId = siteIdRef.current;
+    if (siteId) {
+      try {
+        await fetch(`/api/sites/${siteId}`, { method: "DELETE" });
+      } catch {
+        // Best effort
+      }
+    }
+
+    setLoading(false);
+    toast.info("Création annulée");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!mode) return;
@@ -205,100 +335,255 @@ export default function CreateSitePage() {
     setResult(null);
     setCreating(true);
     setLoading(true);
+    setAborted(false);
+    setFailedStep(null);
+    siteIdRef.current = null;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      const slug = slugify(siteName || prompt.slice(0, 40));
+      const computedSlug = slugify(siteName || prompt.slice(0, 40));
+      const validAffiliates = affiliates.filter((a) => a.name.trim() && a.url.trim());
 
-      const res = await fetch("/api/create-site", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          // Prompt mode
-          site_type: siteType,
-          prompt: prompt.trim(),
-          // Repo mode
-          repo_url: repoUrl.trim() || undefined,
-          // Existing mode
-          site_url: siteUrl.trim() || undefined,
-          existing_repo: existingRepo.trim() || undefined,
-          // Shared
-          name: siteName.trim() || undefined,
-          slug,
-          primary_color: primaryColor,
-          accent_color: accentColor,
-          affiliates: affiliates.filter((a) => a.name.trim() && a.url.trim()),
-          twitter: twitter.trim() || undefined,
-          instagram: instagram.trim() || undefined,
-          linkedin: linkedin.trim() || undefined,
-          adsense_id: adsenseId.trim() || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Request failed" }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-
-            if (event.step === "complete") {
-              setResult({
-                siteId: event.siteId,
-                repoUrl: event.repoUrl,
-                siteUrl: event.siteUrl,
-                articlesQueued: event.articlesQueued,
-              });
-              continue;
-            }
-
-            if (event.status === "done") {
-              updateStepStatus(event.step, "done");
-              markNextInProgress(event.step);
-            } else if (event.status === "error") {
-              updateStepStatus(event.step, "error", event.error);
-              markNextInProgress(event.step);
-            } else if (event.status === "progress") {
-              setSteps((prev) =>
-                prev.map((s) =>
-                  s.key === event.step
-                    ? {
-                        ...s,
-                        status: "in_progress" as StepStatus,
-                        detail: s.detail
-                          ? `${s.detail}, ${event.message}`
-                          : event.message,
-                      }
-                    : s
-                )
-              );
-            }
-          } catch {
-            // Skip malformed lines
-          }
-        }
+      if (mode === "prompt") {
+        await runPromptFlow(computedSlug, validAffiliates, controller.signal);
+      } else if (mode === "repo") {
+        await runRepoFlow(computedSlug, controller.signal);
+      } else if (mode === "existing") {
+        await runExistingFlow(computedSlug, controller.signal);
       }
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       const message = err instanceof Error ? err.message : "Erreur lors de la création";
       toast.error(message);
-      setCreating(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runPromptFlow(
+    computedSlug: string,
+    validAffiliates: AffiliateRow[],
+    signal: AbortSignal
+  ) {
+    // Step 1 — Init
+    await streamEndpoint(
+      "/api/create-site/init",
+      {
+        mode: "prompt",
+        site_type: siteType,
+        prompt: prompt.trim(),
+        name: siteName.trim() || undefined,
+        slug: computedSlug,
+        primary_color: primaryColor,
+        accent_color: accentColor,
+        affiliates: validAffiliates,
+        twitter: twitter.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        linkedin: linkedin.trim() || undefined,
+        adsense_id: adsenseId.trim() || undefined,
+      },
+      handleStreamEvent,
+      signal
+    );
+
+    if (aborted) return;
+    const siteId = siteIdRef.current;
+    if (!siteId) {
+      setFailedStep("init");
+      throw new Error("Site ID not received from init step");
+    }
+
+    // Step 2 — Generate (arch + layout + pages)
+    try {
+      await streamEndpoint(
+        "/api/create-site/generate",
+        {
+          siteId,
+          prompt: prompt.trim(),
+          siteType,
+          config: {
+            siteName: siteName.trim() || undefined,
+            primaryColor,
+            accentColor,
+            affiliates: validAffiliates,
+            social: { twitter: twitter.trim(), instagram: instagram.trim(), linkedin: linkedin.trim() },
+            adsenseId: adsenseId.trim() || undefined,
+          },
+        },
+        handleStreamEvent,
+        signal
+      );
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setFailedStep("generate");
+      throw err;
+    }
+
+    if (aborted) return;
+
+    // Step 3 — Deploy (GitHub + Vercel)
+    try {
+      await streamEndpoint(
+        "/api/create-site/deploy",
+        { siteId },
+        handleStreamEvent,
+        signal
+      );
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setFailedStep("deploy");
+      throw err;
+    }
+
+    if (aborted) return;
+
+    // Step 4 — Articles
+    try {
+      await streamEndpoint(
+        "/api/create-site/articles",
+        { siteId },
+        handleStreamEvent,
+        signal
+      );
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setFailedStep("articles");
+      throw err;
+    }
+  }
+
+  async function runRepoFlow(computedSlug: string, signal: AbortSignal) {
+    // Repo + existing modes still use the old single-endpoint approach
+    // Init
+    updateStepStatus("analyze", "done");
+    markNextInProgress("analyze");
+
+    await streamEndpoint(
+      "/api/create-site/init",
+      {
+        mode: "repo",
+        repo_url: repoUrl.trim(),
+        name: siteName.trim() || undefined,
+        slug: computedSlug,
+        primary_color: primaryColor,
+        accent_color: accentColor,
+        affiliates: affiliates.filter((a) => a.name.trim() && a.url.trim()),
+      },
+      handleStreamEvent,
+      signal
+    );
+
+    if (aborted) return;
+    const siteId = siteIdRef.current;
+    if (!siteId) return;
+
+    // Deploy (GitHub repo already exists, just need Vercel)
+    try {
+      await streamEndpoint(
+        "/api/create-site/deploy",
+        { siteId },
+        handleStreamEvent,
+        signal
+      );
+    } catch {
+      // Non-critical for repo mode
+    }
+
+    if (aborted) return;
+
+    // Articles
+    updateStepStatus("articles", "done");
+    send_complete(siteId);
+  }
+
+  async function runExistingFlow(computedSlug: string, signal: AbortSignal) {
+    updateStepStatus("scrape", "done");
+    markNextInProgress("scrape");
+
+    await streamEndpoint(
+      "/api/create-site/init",
+      {
+        mode: "existing",
+        site_url: siteUrl.trim(),
+        existing_repo: existingRepo.trim() || undefined,
+        name: siteName.trim() || undefined,
+        slug: computedSlug,
+        primary_color: primaryColor,
+        accent_color: accentColor,
+      },
+      handleStreamEvent,
+      signal
+    );
+
+    if (aborted) return;
+    const siteId = siteIdRef.current;
+    if (!siteId) return;
+
+    updateStepStatus("connect", "done");
+    markNextInProgress("connect");
+    updateStepStatus("vercel", "done");
+    markNextInProgress("vercel");
+    updateStepStatus("articles", "done");
+
+    send_complete(siteId);
+  }
+
+  function send_complete(siteId: string) {
+    setResult((prev) => ({ ...prev, siteId }));
+  }
+
+  async function handleRetry() {
+    if (!failedStep || !siteIdRef.current) return;
+
+    const siteId = siteIdRef.current;
+    setLoading(true);
+    setFailedStep(null);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const signal = controller.signal;
+    const validAffiliates = affiliates.filter((a) => a.name.trim() && a.url.trim());
+
+    try {
+      if (failedStep === "generate") {
+        await streamEndpoint(
+          "/api/create-site/generate",
+          {
+            siteId,
+            prompt: prompt.trim(),
+            siteType,
+            config: {
+              siteName: siteName.trim() || undefined,
+              primaryColor,
+              accentColor,
+              affiliates: validAffiliates,
+              social: { twitter: twitter.trim(), instagram: instagram.trim(), linkedin: linkedin.trim() },
+              adsenseId: adsenseId.trim() || undefined,
+            },
+          },
+          handleStreamEvent,
+          signal
+        );
+
+        if (aborted) return;
+
+        await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
+
+        await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
+      } else if (failedStep === "deploy") {
+        await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
+
+        await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
+      } else if (failedStep === "articles") {
+        await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      toast.error(err instanceof Error ? err.message : "Erreur lors du retry");
     } finally {
       setLoading(false);
     }
@@ -516,6 +801,18 @@ export default function CreateSitePage() {
                   <strong>{step.label.replace("...", "")}</strong>: {step.error}
                 </div>
               ))}
+
+            {/* Cancel button */}
+            {loading && (
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                className="w-full"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Annuler la création
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -571,6 +868,12 @@ export default function CreateSitePage() {
                 {result.siteId && (
                   <Button onClick={() => router.push(`/sites/${result.siteId}`)}>
                     Voir le dashboard
+                  </Button>
+                )}
+                {hasErrors && failedStep && (
+                  <Button variant="outline" onClick={handleRetry}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Réessayer
                   </Button>
                 )}
                 {hasErrors && (
