@@ -6,12 +6,19 @@ import fs from "fs/promises";
 import path from "path";
 import {
   callGeminiJSON,
-  callGemini,
-  getSystemPromptForGeneration,
-  buildGenerationUserPrompt,
+  getArchitectureSystemPrompt,
+  getLayoutSystemPrompt,
+  getPageSystemPrompt,
+  buildArchitectureUserPrompt,
+  buildLayoutUserPrompt,
+  buildPageUserPrompt,
   ARTICLE_IDEAS_SYSTEM_PROMPT,
   buildArticleIdeasPrompt,
   type GeminiGenerateResult,
+  type GeminiArchitectureResult,
+  type GeminiLayoutResult,
+  type GeminiPageResult,
+  type GeminiFile,
 } from "@/lib/gemini";
 
 export const runtime = "nodejs";
@@ -19,8 +26,9 @@ export const maxDuration = 300;
 
 type StepEvent = {
   step: string;
-  status: "done" | "error";
+  status: "done" | "error" | "progress";
   error?: string;
+  message?: string;
   siteId?: string;
   repoUrl?: string;
   siteUrl?: string;
@@ -221,46 +229,174 @@ async function handlePromptMode(
     return;
   }
 
-  // Step 2 — Generate code with Gemini
+  // Step 2a — Architecture planning (fast, ~5s)
   let generatedFiles: GeminiGenerateResult | null = null;
+  let architecture: GeminiArchitectureResult | null = null;
   try {
-    const systemPrompt = getSystemPromptForGeneration(siteType);
-    const genUserPrompt = buildGenerationUserPrompt({
+    const archSystemPrompt = getArchitectureSystemPrompt(siteType);
+    const archUserPrompt = buildArchitectureUserPrompt({
       prompt: userPrompt,
       siteName,
       primaryColor: body.primary_color,
       accentColor: body.accent_color,
       affiliates: validAffiliates,
-      social: {
-        twitter: body.twitter,
-        instagram: body.instagram,
-        linkedin: body.linkedin,
-      },
-      adsenseId: body.adsense_id,
     });
 
-    generatedFiles = await callGeminiJSON<GeminiGenerateResult>(
-      systemPrompt,
-      genUserPrompt,
-      { maxOutputTokens: 65536, retries: 3 }
+    architecture = await callGeminiJSON<GeminiArchitectureResult>(
+      archSystemPrompt,
+      archUserPrompt,
+      { maxOutputTokens: 4096, retries: 2 }
     );
 
-    if (!generatedFiles?.files || generatedFiles.files.length === 0) {
-      throw new Error("Gemini returned no files");
+    if (!architecture?.pages || architecture.pages.length === 0) {
+      throw new Error("Gemini returned no pages in architecture");
     }
 
     send({
-      step: "generate",
+      step: "generate_arch",
       status: "done",
-      filesCount: generatedFiles.files.length,
+      message: `${architecture.pages.length} pages planifiées`,
     });
   } catch (err) {
     send({
-      step: "generate",
+      step: "generate_arch",
       status: "error",
-      error: err instanceof Error ? err.message : "Failed to generate code",
+      error: err instanceof Error ? err.message : "Failed to plan architecture",
     });
-    // Continue to try remaining steps even with generation failure
+  }
+
+  // Step 2b — Layout + shared components (~20s)
+  let layoutResult: GeminiLayoutResult | null = null;
+  if (architecture) {
+    try {
+      const layoutSystemPrompt = getLayoutSystemPrompt(siteType);
+      const layoutUserPrompt = buildLayoutUserPrompt(
+        {
+          prompt: userPrompt,
+          siteName,
+          primaryColor: body.primary_color,
+          accentColor: body.accent_color,
+          affiliates: validAffiliates,
+          social: {
+            twitter: body.twitter,
+            instagram: body.instagram,
+            linkedin: body.linkedin,
+          },
+          adsenseId: body.adsense_id,
+        },
+        architecture
+      );
+
+      layoutResult = await callGeminiJSON<GeminiLayoutResult>(
+        layoutSystemPrompt,
+        layoutUserPrompt,
+        { maxOutputTokens: 32768, retries: 2 }
+      );
+
+      if (!layoutResult?.files || layoutResult.files.length === 0) {
+        throw new Error("Gemini returned no layout files");
+      }
+
+      send({
+        step: "generate_layout",
+        status: "done",
+        filesCount: layoutResult.files.length,
+      });
+    } catch (err) {
+      send({
+        step: "generate_layout",
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed to generate layout",
+      });
+    }
+  } else {
+    send({ step: "generate_layout", status: "error", error: "Skipped: no architecture" });
+  }
+
+  // Step 2c — Pages (batched, max 3 concurrent, ~10-20s each)
+  const pageFiles: GeminiFile[] = [];
+  if (architecture) {
+    try {
+      const pageSystemPrompt = getPageSystemPrompt();
+      const sharedComponentNames = (layoutResult?.files || [])
+        .filter((f) => f.path.startsWith("src/components/"))
+        .map((f) => f.path.replace("src/components/", "").replace(/\.tsx?$/, ""));
+
+      const pagesToGenerate = architecture.pages;
+      const BATCH_SIZE = 3;
+
+      for (let i = 0; i < pagesToGenerate.length; i += BATCH_SIZE) {
+        const batch = pagesToGenerate.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+          batch.map(async (page) => {
+            const pageUserPrompt = buildPageUserPrompt(
+              page,
+              architecture!,
+              sharedComponentNames
+            );
+            return callGeminiJSON<GeminiPageResult>(
+              pageSystemPrompt,
+              pageUserPrompt,
+              { maxOutputTokens: 16384, retries: 2 }
+            );
+          })
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j];
+          const page = batch[j];
+          if (result.status === "fulfilled" && result.value?.files) {
+            pageFiles.push(...result.value.files);
+            send({
+              step: "generate_pages",
+              status: "progress",
+              message: `${page.title} OK`,
+            });
+          } else {
+            send({
+              step: "generate_pages",
+              status: "progress",
+              message: `${page.title} — erreur`,
+            });
+          }
+        }
+      }
+
+      send({
+        step: "generate_pages",
+        status: "done",
+        filesCount: pageFiles.length,
+      });
+    } catch (err) {
+      send({
+        step: "generate_pages",
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed to generate pages",
+      });
+    }
+  } else {
+    send({ step: "generate_pages", status: "error", error: "Skipped: no architecture" });
+  }
+
+  // Merge all generated files into the expected format
+  {
+    const allFiles = [...(layoutResult?.files || []), ...pageFiles];
+    const allDeps = [
+      ...(layoutResult?.dependencies || []),
+      ...(architecture?.dependencies || []),
+    ];
+
+    if (allFiles.length > 0) {
+      generatedFiles = {
+        files: allFiles,
+        dependencies: [...new Set(allDeps)],
+        sitemap_routes:
+          architecture?.pages
+            .map((p) => p.slug)
+            .filter((s) => !s.includes("[")) || [],
+      };
+    }
   }
 
   // Step 3 — GitHub: push starter + generated files

@@ -51,11 +51,14 @@ type Step = {
   label: string;
   status: StepStatus;
   error?: string;
+  detail?: string;
 };
 
 const STEPS_PROMPT: Omit<Step, "status">[] = [
   { key: "supabase", label: "Création du site en base..." },
-  { key: "generate", label: "Génération du code par l'IA..." },
+  { key: "generate_arch", label: "Planification de l'architecture..." },
+  { key: "generate_layout", label: "Génération du layout et composants..." },
+  { key: "generate_pages", label: "Génération des pages..." },
   { key: "github", label: "Push vers GitHub..." },
   { key: "vercel", label: "Déploiement Vercel..." },
   { key: "articles", label: "Génération de 50 idées d'articles..." },
@@ -272,6 +275,20 @@ export default function CreateSitePage() {
             } else if (event.status === "error") {
               updateStepStatus(event.step, "error", event.error);
               markNextInProgress(event.step);
+            } else if (event.status === "progress") {
+              setSteps((prev) =>
+                prev.map((s) =>
+                  s.key === event.step
+                    ? {
+                        ...s,
+                        status: "in_progress" as StepStatus,
+                        detail: s.detail
+                          ? `${s.detail}, ${event.message}`
+                          : event.message,
+                      }
+                    : s
+                )
+              );
             }
           } catch {
             // Skip malformed lines
@@ -479,7 +496,12 @@ export default function CreateSitePage() {
             {steps.map((step) => (
               <div key={step.key} className="flex items-center gap-3">
                 {getStepIcon(step.status)}
-                <span className="flex-1 text-sm">{step.label}</span>
+                <div className="flex-1">
+                  <span className="text-sm">{step.label}</span>
+                  {step.detail && (
+                    <p className="text-xs text-muted-foreground">{step.detail}</p>
+                  )}
+                </div>
                 {getStepBadge(step.status)}
               </div>
             ))}

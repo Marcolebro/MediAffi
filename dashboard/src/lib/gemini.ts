@@ -306,3 +306,254 @@ Auteur : Rédaction ${siteName}
 
 L'article doit faire 1500-2000 mots, être bien structuré avec des H2/H3, et contenir du vrai contenu pertinent.`;
 }
+
+// ─── MULTI-STEP GENERATION (architecture → layout → pages) ───
+
+export type GeminiArchitecturePage = {
+  slug: string;
+  title: string;
+  description: string;
+  components_needed: string[];
+};
+
+export type GeminiArchitectureResult = {
+  pages: GeminiArchitecturePage[];
+  shared_components: string[];
+  fonts: { heading: string; body: string };
+  dependencies: string[];
+};
+
+export type GeminiLayoutResult = {
+  files: GeminiFile[];
+  dependencies: string[];
+};
+
+export type GeminiPageResult = {
+  files: GeminiFile[];
+};
+
+const SHARED_CONTEXT = `## STACK TECHNIQUE
+- Next.js 16 (App Router) avec TypeScript strict
+- React 19 (Server Components par défaut, "use client" quand nécessaire)
+- Tailwind CSS 4 pour tout le styling
+- next/font/google pour les fonts
+- lucide-react pour les icônes
+- next-mdx-remote/rsc pour le rendu des articles MDX
+
+## INFRASTRUCTURE EXISTANTE (ne pas recréer)
+- src/lib/products.ts — getProduct(slug), getAllProducts(), getProductsByCategory(cat). Lit site-data/products.json
+- src/lib/articles.ts — getAllArticles(), getArticle(slug), getArticlesByCategory(cat). Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
+- src/lib/supabase.ts — client Supabase, trackAffiliateClick()
+- src/lib/utils.ts — cn(), formatDate(), slugify()
+- src/app/go/[slug]/route.ts — redirect affilié. CTA d'affiliation → /go/{product.affiliate_slug}
+- src/app/api/newsletter/route.ts — POST { email }
+- src/app/sitemap.ts et src/app/robots.ts — auto`;
+
+const SHARED_RULES = `## REGLES
+- TypeScript strict, aucun any
+- Server Components par défaut, "use client" uniquement quand nécessaire
+- Mobile-first responsive (320px → 1440px)
+- Le site doit être BEAU et PROFESSIONNEL
+- Animations subtiles (hover, transitions, fade-in)
+- Icônes via lucide-react
+- Écris tout le contenu en français, du VRAI contenu (pas de lorem ipsum)
+- Aucun crash si products.json ou content/articles/ est vide
+- Metadata SEO (title, description, OG) sur chaque page
+- CTA affiliés via /go/{affiliate_slug} avec rel="nofollow sponsored"
+- Le code doit passer npm run build sans erreur`;
+
+function getSiteTypeContext(siteType: "affiliation" | "media" | "libre"): string {
+  if (siteType === "affiliation") return SITE_TYPE_AFFILIATION;
+  if (siteType === "media") return SITE_TYPE_MEDIA;
+  return SITE_TYPE_LIBRE;
+}
+
+export function getArchitectureSystemPrompt(siteType: "affiliation" | "media" | "libre"): string {
+  return `Tu es un architecte web senior. Tu planifies la STRUCTURE d'un site Next.js.
+
+${SHARED_CONTEXT}
+
+${getSiteTypeContext(siteType)}
+
+## TA TACHE
+Retourne UNIQUEMENT un JSON avec cette structure EXACTE :
+{
+  "pages": [
+    { "slug": "/", "title": "Accueil", "description": "Description du contenu de cette page", "components_needed": ["Hero", "ProductGrid"] },
+    { "slug": "/classement", "title": "Classement", "description": "...", "components_needed": ["RankingTable"] }
+  ],
+  "shared_components": ["Header", "Footer", "ProductCard", "ArticleCard", "Newsletter"],
+  "fonts": { "heading": "Inter", "body": "Inter" },
+  "dependencies": ["framer-motion", "@radix-ui/react-dialog"]
+}
+
+REGLES :
+- Chaque lien dans le nav DOIT avoir sa page dans le tableau "pages"
+- Inclure TOUJOURS : page accueil ("/"), page article/[slug] ("/article/[slug]")
+- Inclure les pages légales si pertinent
+- NE PAS générer de code, UNIQUEMENT le plan structurel
+- "shared_components" = composants utilisés par 2+ pages (Header et Footer obligatoires)
+- "dependencies" = packages npm supplémentaires nécessaires
+- Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks`;
+}
+
+export function getLayoutSystemPrompt(siteType: "affiliation" | "media" | "libre"): string {
+  return `Tu es un développeur frontend senior Next.js 16 + React 19 + TypeScript + Tailwind CSS 4.
+
+${SHARED_CONTEXT}
+
+${getSiteTypeContext(siteType)}
+
+${SHARED_RULES}
+
+## TA TACHE
+Tu génères UNIQUEMENT le layout, les styles globaux, et les composants PARTAGÉS du site.
+
+Fichiers à générer :
+1. **src/app/layout.tsx** — Root layout avec fonts (next/font/google), import globals.css, html lang="fr", Header + Footer wrapping {children}, metadata title/description, ThemeProvider si dark mode
+2. **src/styles/globals.css** — Tailwind CSS 4 + custom styles + animations
+3. **src/components/Header.tsx** — Navigation principale (liens vers les pages du site)
+4. **src/components/Footer.tsx** — Footer du site
+5. **Autres composants partagés** — Ceux listés dans l'architecture fournie (ProductCard, ArticleCard, etc.)
+6. **site-data/products.json** — Données des produits/affiliés
+
+NE PAS générer les pages (page.tsx). Uniquement le layout et les composants réutilisables.
+Le Header doit avoir des liens vers TOUTES les pages listées dans l'architecture.
+
+### Design
+- Le site doit être BEAU et PROFESSIONNEL — pas un template générique
+- Mobile-first responsive (320px → 1440px)
+- Les cards doivent avoir : ombres, bordures subtiles, hover effects
+- Images placeholder propres (dégradés, icônes) quand pas d'images réelles
+
+## FORMAT DE REPONSE
+{
+  "files": [{ "path": "chemin/relatif/fichier.tsx", "content": "contenu complet du fichier" }],
+  "dependencies": ["package1", "package2"]
+}
+Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks.`;
+}
+
+export function getPageSystemPrompt(): string {
+  return `Tu es un développeur frontend senior Next.js 16 + React 19 + TypeScript + Tailwind CSS 4.
+
+${SHARED_CONTEXT}
+
+${SHARED_RULES}
+
+## TA TACHE
+Tu génères UNE SEULE PAGE du site. Les composants partagés (Header, Footer, etc.) sont déjà dans le layout — NE PAS les recréer. Utilise-les via import depuis "@/components/...".
+
+IMPORTANT:
+- Le Header et Footer sont dans le layout.tsx, NE PAS les inclure dans la page
+- Utilise les composants partagés fournis via import
+- Pour la page article/[slug] : params est un Promise dans Next.js 16 → const { slug } = await params;
+- generateStaticParams() pour les pages dynamiques
+- Chaque page a des metadata (title, description) via export const metadata ou generateMetadata()
+- Schema.org JSON-LD si pertinent (WebSite sur homepage, Article sur page article)
+
+### Design
+- La page doit être visuellement riche et engageante
+- Mobile-first responsive
+- Animations subtiles (hover, transitions)
+- Du VRAI contenu en français
+
+## FORMAT DE REPONSE
+{
+  "files": [{ "path": "chemin/relatif/fichier.tsx", "content": "contenu complet du fichier" }]
+}
+Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks.`;
+}
+
+export function buildArchitectureUserPrompt(opts: {
+  prompt: string;
+  siteName?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  affiliates?: { name: string; url: string }[];
+}): string {
+  const parts: string[] = [];
+  parts.push(`## DESCRIPTION DU SITE\n${opts.prompt}`);
+  if (opts.siteName) parts.push(`\n## NOM DU SITE\n${opts.siteName}`);
+  if (opts.primaryColor || opts.accentColor) {
+    parts.push(`\n## COULEURS\n- Primary: ${opts.primaryColor || "#3b82f6"}\n- Accent: ${opts.accentColor || "#10b981"}`);
+  }
+  if (opts.affiliates && opts.affiliates.length > 0) {
+    parts.push(`\n## PROGRAMMES AFFILIES`);
+    for (const a of opts.affiliates) parts.push(`- ${a.name}: ${a.url}`);
+  }
+  parts.push(`\nPlanifie l'architecture complète du site. Liste toutes les pages, composants partagés, fonts et dépendances.`);
+  return parts.join("\n");
+}
+
+export function buildLayoutUserPrompt(
+  opts: {
+    prompt: string;
+    siteName?: string;
+    primaryColor?: string;
+    accentColor?: string;
+    affiliates?: { name: string; url: string }[];
+    social?: { twitter?: string; instagram?: string; linkedin?: string };
+    adsenseId?: string;
+  },
+  architecture: GeminiArchitectureResult
+): string {
+  const parts: string[] = [];
+  parts.push(`## DESCRIPTION DU SITE\n${opts.prompt}`);
+  if (opts.siteName) parts.push(`\n## NOM DU SITE\n${opts.siteName}`);
+  if (opts.primaryColor || opts.accentColor) {
+    parts.push(`\n## COULEURS\n- Primary: ${opts.primaryColor || "#3b82f6"}\n- Accent: ${opts.accentColor || "#10b981"}`);
+  }
+  if (opts.affiliates && opts.affiliates.length > 0) {
+    parts.push(`\n## PROGRAMMES AFFILIES\nGénère le products.json avec ces programmes :`);
+    for (const a of opts.affiliates) parts.push(`- ${a.name}: ${a.url}`);
+  }
+  if (opts.social) {
+    const socialParts: string[] = [];
+    if (opts.social.twitter) socialParts.push(`Twitter: ${opts.social.twitter}`);
+    if (opts.social.instagram) socialParts.push(`Instagram: ${opts.social.instagram}`);
+    if (opts.social.linkedin) socialParts.push(`LinkedIn: ${opts.social.linkedin}`);
+    if (socialParts.length > 0) parts.push(`\n## RESEAUX SOCIAUX\n${socialParts.join("\n")}`);
+  }
+  if (opts.adsenseId) parts.push(`\n## ADSENSE\nID: ${opts.adsenseId}`);
+
+  parts.push(`\n## ARCHITECTURE DU SITE (déjà planifiée)`);
+  parts.push(`Pages : ${architecture.pages.map((p) => `${p.title} (${p.slug})`).join(", ")}`);
+  parts.push(`Composants partagés à générer : ${architecture.shared_components.join(", ")}`);
+  parts.push(`Fonts : heading=${architecture.fonts.heading}, body=${architecture.fonts.body}`);
+
+  parts.push(`\n## LIENS DE NAVIGATION POUR LE HEADER`);
+  for (const page of architecture.pages) {
+    if (page.slug !== "/" && !page.slug.includes("[")) {
+      parts.push(`- "${page.title}" → ${page.slug}`);
+    }
+  }
+
+  parts.push(`\nGénère le layout, globals.css, Header, Footer, les composants partagés listés ci-dessus, et products.json.`);
+  return parts.join("\n");
+}
+
+export function buildPageUserPrompt(
+  page: GeminiArchitecturePage,
+  architecture: GeminiArchitectureResult,
+  sharedComponentNames: string[]
+): string {
+  const parts: string[] = [];
+  parts.push(`## PAGE A GENERER`);
+  parts.push(`- Slug: ${page.slug}`);
+  parts.push(`- Titre: ${page.title}`);
+  parts.push(`- Description: ${page.description}`);
+  parts.push(`- Composants à utiliser: ${page.components_needed.join(", ")}`);
+
+  parts.push(`\n## CONTEXTE DU SITE`);
+  parts.push(`Pages du site : ${architecture.pages.map((p) => `${p.title} (${p.slug})`).join(", ")}`);
+  parts.push(`Fonts : heading=${architecture.fonts.heading}, body=${architecture.fonts.body}`);
+
+  parts.push(`\n## COMPOSANTS PARTAGÉS DISPONIBLES (déjà générés, utilise-les via import)`);
+  for (const name of sharedComponentNames) {
+    parts.push(`- import { ... } from "@/components/${name}"`);
+  }
+
+  parts.push(`\nGénère UNIQUEMENT les fichiers pour la page "${page.title}" (${page.slug}).`);
+  return parts.join("\n");
+}
