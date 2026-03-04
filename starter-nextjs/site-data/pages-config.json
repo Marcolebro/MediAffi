@@ -1,0 +1,11 @@
+{
+  "pages": [
+    { "slug": "homepage", "title": "Accueil", "template": "homepage", "priority": 1.0 },
+    { "slug": "casinos-en-ligne", "title": "Casinos en ligne", "template": "listing", "priority": 0.9 },
+    { "slug": "bonus-et-promotions", "title": "Bonus et Promotions", "template": "listing", "priority": 0.9 },
+    { "slug": "guides-de-jeux", "title": "Guides de Jeux", "template": "guide", "priority": 0.8 },
+    { "slug": "a-propos", "title": "À propos", "template": "static", "priority": 0.5 },
+    { "slug": "contact", "title": "Contact", "template": "static", "priority": 0.5 },
+    { "slug": "mentions-legales", "title": "Mentions Légales", "template": "static", "priority": 0.3 }
+  ]
+}

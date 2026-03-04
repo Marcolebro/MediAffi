@@ -1,0 +1,55 @@
+{
+  "name": "Kazwin",
+  "domain": "kazwin.fr",
+  "tagline": "Votre guide des meilleurs casinos en ligne",
+  "description": "Kazwin est votre référence pour trouver les meilleurs casinos en ligne, bonus et promotions en France.",
+  "language": "fr",
+  "style": "dark",
+  "colors": {
+    "primary": "#8B5CF6",
+    "secondary": "#A78BFA",
+    "accent": "#F59E0B",
+    "background": "#0F172A",
+    "foreground": "#F8FAFC",
+    "muted": "#1E293B",
+    "border": "#334155"
+  },
+  "fonts": {
+    "heading": "Inter",
+    "body": "Inter"
+  },
+  "nav": [
+    { "label": "Accueil", "href": "/" },
+    { "label": "Casinos en ligne", "href": "/casinos-en-ligne" },
+    { "label": "Bonus", "href": "/bonus-et-promotions" },
+    { "label": "Guides", "href": "/guides-de-jeux" },
+    { "label": "À propos", "href": "/a-propos" },
+    { "label": "Contact", "href": "/contact" }
+  ],
+  "footer": {
+    "links": [
+      { "label": "Mentions légales", "href": "/mentions-legales" },
+      { "label": "Contact", "href": "/contact" },
+      { "label": "À propos", "href": "/a-propos" }
+    ],
+    "disclaimer": "Kazwin est un site d'information indépendant. Le jeu comporte des risques : endettement, dépendance. Appelez le 09 74 75 13 13 (appel non surtaxé). Jouer comporte des risques : endettement, isolement, dépendance. Pour être accompagné, appelez le 09 74 75 13 13.",
+    "copyright": "© 2025 Kazwin. Tous droits réservés."
+  },
+  "social": {
+    "twitter": "https://twitter.com/kazwin_fr",
+    "facebook": "https://facebook.com/kazwin",
+    "instagram": "https://instagram.com/kazwin_fr"
+  },
+  "newsletter": {
+    "enabled": true,
+    "title": "Restez informé",
+    "description": "Recevez les meilleurs bonus et offres exclusives directement dans votre boîte mail."
+  },
+  "supabase": {
+    "url": "env:SUPABASE_URL",
+    "anon_key": "env:SUPABASE_ANON_KEY"
+  },
+  "analytics": {
+    "plausible_domain": "kazwin.fr"
+  }
+}

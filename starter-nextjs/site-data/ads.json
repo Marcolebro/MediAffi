@@ -1,0 +1,11 @@
+{
+  "adsense_id": "",
+  "auto_ads": false,
+  "placements": [
+    { "id": "header_banner", "type": "banner", "slot": "", "enabled": false },
+    { "id": "sidebar", "type": "rectangle", "slot": "", "enabled": false },
+    { "id": "in_content", "type": "article", "slot": "", "enabled": false },
+    { "id": "between_products", "type": "infeed", "slot": "", "enabled": false },
+    { "id": "footer", "type": "banner", "slot": "", "enabled": false }
+  ]
+}
