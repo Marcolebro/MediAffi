@@ -14,12 +14,17 @@ export type GeminiGenerateResult = {
 export async function callGemini(
   systemPrompt: string,
   userPrompt: string,
-  options: { temperature?: number; maxOutputTokens?: number } = {}
+  options: { temperature?: number; maxOutputTokens?: number; jsonMode?: boolean } = {}
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
 
-  const { temperature = 0.7, maxOutputTokens = 65536 } = options;
+  const { temperature = 0.7, maxOutputTokens = 65536, jsonMode = false } = options;
+
+  const generationConfig: Record<string, unknown> = { temperature, maxOutputTokens };
+  if (jsonMode) {
+    generationConfig.responseMimeType = "application/json";
+  }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
@@ -27,7 +32,7 @@ export async function callGemini(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature, maxOutputTokens },
+      generationConfig,
       systemInstruction: { parts: [{ text: systemPrompt }] },
     }),
   });
@@ -45,10 +50,42 @@ export async function callGemini(
 
 export function parseGeminiJSON<T>(raw: string): T {
   // Strip markdown code fences if present
-  const cleaned = raw
+  let cleaned = raw
     .replace(/^```(?:json)?\s*\n?/gm, "")
     .replace(/\n?```\s*$/gm, "")
     .trim();
+
+  // Try direct parse first (works with responseMimeType: application/json)
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // Fall through to boundary extraction
+  }
+
+  // Find JSON boundaries (first {/[ to last }/])
+  const firstBrace = cleaned.indexOf("{");
+  const firstBracket = cleaned.indexOf("[");
+
+  if (firstBrace === -1 && firstBracket === -1) {
+    throw new Error("No JSON object or array found in Gemini response");
+  }
+
+  let start: number;
+  let end: number;
+
+  if (firstBracket === -1 || (firstBrace !== -1 && firstBrace < firstBracket)) {
+    start = firstBrace;
+    end = cleaned.lastIndexOf("}") + 1;
+  } else {
+    start = firstBracket;
+    end = cleaned.lastIndexOf("]") + 1;
+  }
+
+  if (end <= start) {
+    throw new Error("Malformed JSON in Gemini response");
+  }
+
+  cleaned = cleaned.slice(start, end);
   return JSON.parse(cleaned) as T;
 }
 
@@ -61,7 +98,7 @@ export async function callGeminiJSON<T>(
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const raw = await callGemini(systemPrompt, userPrompt, callOptions);
+      const raw = await callGemini(systemPrompt, userPrompt, { ...callOptions, jsonMode: true });
       return parseGeminiJSON<T>(raw);
     } catch (err) {
       if (attempt === retries - 1) throw err;
