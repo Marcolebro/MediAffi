@@ -121,6 +121,7 @@ Retourne un JSON avec cette structure EXACTE :
 - Aucun import de fichier qui n'existe pas
 - Le code doit passer npm run build sans erreur
 - CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
+- CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.
 
 ## CONTENU
 - Écris tout le contenu en français
@@ -292,7 +293,8 @@ const SHARED_RULES = `## REGLES
 - Metadata SEO (title, description, OG) sur chaque page
 - CTA affiliés via /go/{affiliate_slug} avec rel="nofollow sponsored"
 - Le code doit passer npm run build sans erreur
-- CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.`;
+- CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
+- CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.`;
 
 function getSiteTypeContext(siteType: "affiliation" | "media" | "libre"): string {
   if (siteType === "affiliation") return SITE_TYPE_AFFILIATION;
