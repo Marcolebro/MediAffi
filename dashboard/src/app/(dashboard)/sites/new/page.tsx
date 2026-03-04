@@ -59,12 +59,10 @@ type Step = {
 const STEPS_PROMPT: Omit<Step, "status">[] = [
   { key: "supabase", label: "Création du site en base..." },
   { key: "generate_arch", label: "Planification de l'architecture..." },
-  { key: "generate_layout", label: "Génération du layout et composants..." },
-  { key: "generate_pages", label: "Génération des pages..." },
+  { key: "generate_files", label: "Génération des fichiers..." },
   { key: "github", label: "Push vers GitHub..." },
   { key: "vercel", label: "Déploiement Vercel..." },
   { key: "articles", label: "Génération de 50 idées d'articles..." },
-  { key: "finalize", label: "Finalisation..." },
 ];
 
 const STEPS_REPO: Omit<Step, "status">[] = [
@@ -165,6 +163,11 @@ export default function CreateSitePage() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [aborted, setAborted] = useState(false);
   const siteIdRef = useRef<string | null>(null);
+
+  // Saved from generate step for retry
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const architectureRef = useRef<any>(null);
+  const filesToGenerateRef = useRef<{ path: string; description: string }[]>([]);
 
   // Progress
   const [steps, setSteps] = useState<Step[]>([]);
@@ -362,11 +365,24 @@ export default function CreateSitePage() {
     }
   }
 
+  function buildGenerateConfig(validAffiliates: AffiliateRow[]) {
+    return {
+      siteName: siteName.trim() || undefined,
+      primaryColor,
+      accentColor,
+      affiliates: validAffiliates,
+      social: { twitter: twitter.trim(), instagram: instagram.trim(), linkedin: linkedin.trim() },
+      adsenseId: adsenseId.trim() || undefined,
+    };
+  }
+
   async function runPromptFlow(
     computedSlug: string,
     validAffiliates: AffiliateRow[],
     signal: AbortSignal
   ) {
+    const config = buildGenerateConfig(validAffiliates);
+
     // Step 1 — Init
     await streamEndpoint(
       "/api/create-site/init",
@@ -395,35 +411,46 @@ export default function CreateSitePage() {
       throw new Error("Site ID not received from init step");
     }
 
-    // Step 2 — Generate (arch + layout + pages)
+    // Step 2 — Architecture planning (single API call, JSON response)
     try {
-      await streamEndpoint(
-        "/api/create-site/generate",
-        {
-          siteId,
-          prompt: prompt.trim(),
-          siteType,
-          config: {
-            siteName: siteName.trim() || undefined,
-            primaryColor,
-            accentColor,
-            affiliates: validAffiliates,
-            social: { twitter: twitter.trim(), instagram: instagram.trim(), linkedin: linkedin.trim() },
-            adsenseId: adsenseId.trim() || undefined,
-          },
-        },
-        handleStreamEvent,
-        signal
+      const res = await fetch("/api/create-site/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteId, prompt: prompt.trim(), siteType, config }),
+        signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      architectureRef.current = data.architecture;
+      filesToGenerateRef.current = data.filesToGenerate;
+
+      updateStepStatus("generate_arch", "done");
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.key === "generate_arch"
+            ? { ...s, detail: `${data.architecture.pages.length} pages planifiées` }
+            : s
+        )
       );
+      markNextInProgress("generate_arch");
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setFailedStep("generate");
+      updateStepStatus("generate_arch", "error", (err as Error).message);
+      setFailedStep("generate_arch");
       throw err;
     }
 
     if (aborted) return;
 
-    // Step 3 — Deploy (GitHub + Vercel)
+    // Step 3 — Generate files one by one
+    await generateFilesSequentially(siteId, config, signal);
+
+    if (aborted) return;
+
+    // Step 4 — Deploy (GitHub + Vercel)
     try {
       await streamEndpoint(
         "/api/create-site/deploy",
@@ -439,7 +466,7 @@ export default function CreateSitePage() {
 
     if (aborted) return;
 
-    // Step 4 — Articles
+    // Step 5 — Articles
     try {
       await streamEndpoint(
         "/api/create-site/articles",
@@ -450,6 +477,76 @@ export default function CreateSitePage() {
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setFailedStep("articles");
+      throw err;
+    }
+  }
+
+  async function generateFilesSequentially(
+    siteId: string,
+    config: ReturnType<typeof buildGenerateConfig>,
+    signal: AbortSignal
+  ) {
+    const files = filesToGenerateRef.current;
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        if (aborted) return;
+
+        const file = files[i];
+        const fileName = file.path.split("/").pop();
+        const isLast = i === files.length - 1;
+
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.key === "generate_files"
+              ? { ...s, status: "in_progress", detail: `${i + 1}/${files.length} — ${fileName}...` }
+              : s
+          )
+        );
+
+        const res = await fetch("/api/create-site/generate-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            siteId,
+            filePath: file.path,
+            fileDescription: file.description,
+            siteType,
+            architecture: architectureRef.current,
+            sitePrompt: prompt.trim(),
+            config,
+            finalize: isLast,
+          }),
+          signal,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(err.error || `Erreur ${fileName}`);
+        }
+
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.key === "generate_files"
+              ? { ...s, detail: `${i + 1}/${files.length} — ${fileName} OK` }
+              : s
+          )
+        );
+      }
+
+      updateStepStatus("generate_files", "done");
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.key === "generate_files"
+            ? { ...s, detail: `${files.length} fichiers générés` }
+            : s
+        )
+      );
+      markNextInProgress("generate_files");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      updateStepStatus("generate_files", "error", (err as Error).message);
+      setFailedStep("generate_files");
       throw err;
     }
   }
@@ -545,38 +642,43 @@ export default function CreateSitePage() {
     abortControllerRef.current = controller;
     const signal = controller.signal;
     const validAffiliates = affiliates.filter((a) => a.name.trim() && a.url.trim());
+    const config = buildGenerateConfig(validAffiliates);
 
     try {
-      if (failedStep === "generate") {
-        await streamEndpoint(
-          "/api/create-site/generate",
-          {
-            siteId,
-            prompt: prompt.trim(),
-            siteType,
-            config: {
-              siteName: siteName.trim() || undefined,
-              primaryColor,
-              accentColor,
-              affiliates: validAffiliates,
-              social: { twitter: twitter.trim(), instagram: instagram.trim(), linkedin: linkedin.trim() },
-              adsenseId: adsenseId.trim() || undefined,
-            },
-          },
-          handleStreamEvent,
-          signal
-        );
+      if (failedStep === "generate_arch") {
+        // Re-do architecture + all files + deploy + articles
+        const res = await fetch("/api/create-site/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ siteId, prompt: prompt.trim(), siteType, config }),
+          signal,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        architectureRef.current = data.architecture;
+        filesToGenerateRef.current = data.filesToGenerate;
+        updateStepStatus("generate_arch", "done");
+        markNextInProgress("generate_arch");
 
         if (aborted) return;
-
+        await generateFilesSequentially(siteId, config, signal);
+        if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
-
+        await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
+      } else if (failedStep === "generate_files") {
+        // Architecture already done, re-generate all files
+        await generateFilesSequentially(siteId, config, signal);
+        if (aborted) return;
+        await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
       } else if (failedStep === "deploy") {
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
-
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
       } else if (failedStep === "articles") {
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);

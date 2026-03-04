@@ -70,7 +70,7 @@ Retourne un JSON avec cette structure EXACTE :
 6. **src/app/article/[slug]/page.tsx** — Page article dynamique :
    - generateStaticParams() qui appelle getArticleSlugs() de lib/articles.ts
    - Charge l'article avec getArticle(slug)
-   - Rend le MDX avec compileMDX de next-mdx-remote/rsc
+   - Rend le MDX avec compileMDX de next-mdx-remote/rsc (v6 : passer blockJS: false dans options, ex: options: { parseFrontmatter: true, blockJS: false })
    - Layout article : titre, date, auteur, catégorie, contenu, sidebar optionnelle
    - SEO : meta title/description depuis le frontmatter
    - IMPORTANT: le params est un Promise dans Next.js 16 : const { slug } = await params;
@@ -120,6 +120,7 @@ Retourne un JSON avec cette structure EXACTE :
 - Aucun crash si products.json est vide ou si content/articles/ est vide
 - Aucun import de fichier qui n'existe pas
 - Le code doit passer npm run build sans erreur
+- CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
 
 ## CONTENU
 - Écris tout le contenu en français
@@ -290,7 +291,8 @@ const SHARED_RULES = `## REGLES
 - Aucun crash si products.json ou content/articles/ est vide
 - Metadata SEO (title, description, OG) sur chaque page
 - CTA affiliés via /go/{affiliate_slug} avec rel="nofollow sponsored"
-- Le code doit passer npm run build sans erreur`;
+- Le code doit passer npm run build sans erreur
+- CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.`;
 
 function getSiteTypeContext(siteType: "affiliation" | "media" | "libre"): string {
   if (siteType === "affiliation") return SITE_TYPE_AFFILIATION;

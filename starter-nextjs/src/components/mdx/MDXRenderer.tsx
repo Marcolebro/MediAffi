@@ -12,6 +12,7 @@ export async function MDXRenderer({ source }: MDXRendererProps) {
       components: getMdxComponents(),
       options: {
         parseFrontmatter: false,
+        blockJS: false,
       },
     });
 

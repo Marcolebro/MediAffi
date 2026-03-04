@@ -208,6 +208,29 @@ export async function POST(request: Request) {
         body: JSON.stringify(envVars),
       }).catch(() => {});
 
+      // Trigger deployment manually (don't rely on GitHub webhook)
+      const deployRes = await fetch("https://api.vercel.com/v13/deployments", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: vercelProjectName,
+          project: project.id,
+          gitSource: {
+            type: "github",
+            repo: repoFullName,
+            ref: "main",
+          },
+        }),
+      });
+
+      if (!deployRes.ok) {
+        const errData = await deployRes.json().catch(() => ({}));
+        send({ step: "vercel", status: "progress", message: `Deployment trigger warning: ${JSON.stringify(errData)}` });
+      }
+
       send({
         step: "vercel",
         status: "done",
