@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import {
   Card,
@@ -16,15 +14,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ArrowLeft, Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Circle,
+  Sparkles,
+  GitBranch,
+  Globe,
+  ChevronDown,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
+
+type CreateMode = "prompt" | "repo" | "existing" | null;
+type SiteType = "affiliation" | "media" | "libre";
 
 type AffiliateRow = {
   name: string;
   url: string;
-  commission: string;
-  category: string;
 };
 
 type StepStatus = "pending" | "in_progress" | "done" | "error";
@@ -36,14 +53,38 @@ type Step = {
   error?: string;
 };
 
-const INITIAL_STEPS: Omit<Step, "status">[] = [
-  { key: "supabase", label: "Creation du site en base..." },
-  { key: "github", label: "Creation du repo GitHub..." },
-  { key: "config", label: "Generation de la configuration..." },
-  { key: "vercel", label: "Deploiement Vercel..." },
-  { key: "articles", label: "Generation de 50 articles..." },
-  { key: "update", label: "Finalisation..." },
+const STEPS_PROMPT: Omit<Step, "status">[] = [
+  { key: "supabase", label: "Création du site en base..." },
+  { key: "generate", label: "Génération du code par l'IA..." },
+  { key: "github", label: "Push vers GitHub..." },
+  { key: "vercel", label: "Déploiement Vercel..." },
+  { key: "articles", label: "Génération de 50 idées d'articles..." },
+  { key: "finalize", label: "Finalisation..." },
 ];
+
+const STEPS_REPO: Omit<Step, "status">[] = [
+  { key: "analyze", label: "Analyse du repo..." },
+  { key: "supabase", label: "Création en base..." },
+  { key: "vercel", label: "Déploiement Vercel..." },
+  { key: "articles", label: "Génération d'articles..." },
+];
+
+const STEPS_EXISTING: Omit<Step, "status">[] = [
+  { key: "scrape", label: "Analyse du site..." },
+  { key: "supabase", label: "Création en base..." },
+  { key: "connect", label: "Connexion..." },
+  { key: "vercel", label: "Configuration Vercel..." },
+  { key: "articles", label: "Génération d'articles..." },
+];
+
+const PLACEHOLDERS: Record<SiteType, string> = {
+  affiliation:
+    "Ex: Un site de comparaison de casinos en ligne français. Page d'accueil avec classement des meilleurs casinos, pages bonus, guides de jeux (roulette, blackjack, slots), pages légales. Design moderne et premium avec des couleurs sombres et dorées.",
+  media:
+    "Ex: Un magazine en ligne sur la tech et l'IA. Homepage magazine avec articles hero + grille, catégories (IA, startups, gadgets, crypto), newsletter, section à propos. Style clean et minimaliste, typographie soignée.",
+  libre:
+    "Décrivez votre site en détail : pages souhaitées, fonctionnalités, style visuel, contenu...",
+};
 
 function slugify(text: string): string {
   return text
@@ -56,11 +97,11 @@ function slugify(text: string): string {
 
 export default function CreateSitePage() {
   const router = useRouter();
+  const [mode, setMode] = useState<CreateMode>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [slugEdited, setSlugEdited] = useState(false);
 
-  // Progress tracking
+  // Progress
   const [steps, setSteps] = useState<Step[]>([]);
   const [result, setResult] = useState<{
     siteId?: string;
@@ -69,55 +110,37 @@ export default function CreateSitePage() {
     articlesQueued?: number;
   } | null>(null);
 
-  // General
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [domain, setDomain] = useState("");
-  const [niche, setNiche] = useState("");
-  const [description, setDescription] = useState("");
+  // Mode Prompt
+  const [siteType, setSiteType] = useState<SiteType>("affiliation");
+  const [prompt, setPrompt] = useState("");
 
-  // Affiliation
-  const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
+  // Mode Repo
+  const [repoUrl, setRepoUrl] = useState("");
 
-  // Social
-  const [instagram, setInstagram] = useState("");
-  const [twitter, setTwitter] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [pinterest, setPinterest] = useState("");
-  const [tiktok, setTiktok] = useState("");
+  // Mode Existing
+  const [siteUrl, setSiteUrl] = useState("");
+  const [existingRepo, setExistingRepo] = useState("");
 
-  // Monetization
-  const [adsenseId, setAdsenseId] = useState("");
-  const [autoAds, setAutoAds] = useState(false);
-
-  // Newsletter
-  const [resendAudienceId, setResendAudienceId] = useState("");
-
-  // Config
-  const [articlesPerDay, setArticlesPerDay] = useState(3);
-  const [autoSocial, setAutoSocial] = useState(true);
-  const [autoNewsletter, setAutoNewsletter] = useState(true);
-
-  // Technical
+  // Advanced config (shared)
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [siteName, setSiteName] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#3b82f6");
   const [accentColor, setAccentColor] = useState("#10b981");
+  const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
+  const [twitter, setTwitter] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [adsenseId, setAdsenseId] = useState("");
 
-  function handleNameChange(value: string) {
-    setName(value);
-    if (!slugEdited) {
-      setSlug(slugify(value));
-    }
+  function addAffiliate() {
+    setAffiliates([...affiliates, { name: "", url: "" }]);
   }
 
-  function addAffiliateRow() {
-    setAffiliates([...affiliates, { name: "", url: "", commission: "", category: "" }]);
-  }
-
-  function removeAffiliateRow(index: number) {
+  function removeAffiliate(index: number) {
     setAffiliates(affiliates.filter((_, i) => i !== index));
   }
 
-  function updateAffiliateRow(index: number, field: keyof AffiliateRow, value: string) {
+  function updateAffiliate(index: number, field: keyof AffiliateRow, value: string) {
     const updated = [...affiliates];
     updated[index] = { ...updated[index], [field]: value };
     setAffiliates(updated);
@@ -132,32 +155,46 @@ export default function CreateSitePage() {
     []
   );
 
-  const markNextInProgress = useCallback(
-    (currentKey: string) => {
-      setSteps((prev) => {
-        const idx = prev.findIndex((s) => s.key === currentKey);
-        const nextIdx = idx + 1;
-        if (nextIdx < prev.length && prev[nextIdx].status === "pending") {
-          return prev.map((s, i) =>
-            i === nextIdx ? { ...s, status: "in_progress" as StepStatus } : s
-          );
-        }
-        return prev;
-      });
-    },
-    []
-  );
+  const markNextInProgress = useCallback((currentKey: string) => {
+    setSteps((prev) => {
+      const idx = prev.findIndex((s) => s.key === currentKey);
+      const nextIdx = idx + 1;
+      if (nextIdx < prev.length && prev[nextIdx].status === "pending") {
+        return prev.map((s, i) =>
+          i === nextIdx ? { ...s, status: "in_progress" as StepStatus } : s
+        );
+      }
+      return prev;
+    });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !slug.trim() || !niche.trim()) {
-      toast.error("Name, slug, and niche are required.");
+    if (!mode) return;
+
+    // Validation
+    if (mode === "prompt" && !prompt.trim()) {
+      toast.error("Veuillez décrire votre site.");
+      return;
+    }
+    if (mode === "repo" && !repoUrl.trim()) {
+      toast.error("Veuillez entrer l'URL du repo.");
+      return;
+    }
+    if (mode === "existing" && !siteUrl.trim()) {
+      toast.error("Veuillez entrer l'URL du site.");
       return;
     }
 
-    // Initialize steps and switch to progress view
+    const stepsTemplate =
+      mode === "prompt"
+        ? STEPS_PROMPT
+        : mode === "repo"
+          ? STEPS_REPO
+          : STEPS_EXISTING;
+
     setSteps(
-      INITIAL_STEPS.map((s, i) => ({
+      stepsTemplate.map((s, i) => ({
         ...s,
         status: i === 0 ? "in_progress" : "pending",
       }))
@@ -167,29 +204,31 @@ export default function CreateSitePage() {
     setLoading(true);
 
     try {
+      const slug = slugify(siteName || prompt.slice(0, 40));
+
       const res = await fetch("/api/create-site", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          slug: slug.trim(),
-          niche: niche.trim(),
-          domain: domain.trim() || undefined,
-          description: description.trim() || undefined,
-          affiliates,
-          instagram: instagram.trim() || undefined,
-          twitter: twitter.trim() || undefined,
-          linkedin: linkedin.trim() || undefined,
-          pinterest: pinterest.trim() || undefined,
-          tiktok: tiktok.trim() || undefined,
-          adsense_id: adsenseId.trim() || undefined,
-          auto_ads: autoAds,
-          resend_audience_id: resendAudienceId.trim() || undefined,
-          articles_per_day: articlesPerDay,
-          auto_social: autoSocial,
-          auto_newsletter: autoNewsletter,
+          mode,
+          // Prompt mode
+          site_type: siteType,
+          prompt: prompt.trim(),
+          // Repo mode
+          repo_url: repoUrl.trim() || undefined,
+          // Existing mode
+          site_url: siteUrl.trim() || undefined,
+          existing_repo: existingRepo.trim() || undefined,
+          // Shared
+          name: siteName.trim() || undefined,
+          slug,
           primary_color: primaryColor,
           accent_color: accentColor,
+          affiliates: affiliates.filter((a) => a.name.trim() && a.url.trim()),
+          twitter: twitter.trim() || undefined,
+          instagram: instagram.trim() || undefined,
+          linkedin: linkedin.trim() || undefined,
+          adsense_id: adsenseId.trim() || undefined,
         }),
       });
 
@@ -235,12 +274,12 @@ export default function CreateSitePage() {
               markNextInProgress(event.step);
             }
           } catch {
-            // Skip malformed JSON lines
+            // Skip malformed lines
           }
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create site";
+      const message = err instanceof Error ? err.message : "Erreur lors de la création";
       toast.error(message);
       setCreating(false);
     } finally {
@@ -266,7 +305,11 @@ export default function CreateSitePage() {
       case "in_progress":
         return <Badge variant="secondary">En cours</Badge>;
       case "done":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">OK</Badge>;
+        return (
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+            OK
+          </Badge>
+        );
       case "error":
         return <Badge variant="destructive">Erreur</Badge>;
       default:
@@ -274,7 +317,150 @@ export default function CreateSitePage() {
     }
   }
 
-  // Progress view
+  // ─── Advanced config section (reused) ───
+  function renderAdvancedConfig() {
+    return (
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" type="button" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Configuration avancée
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-4">
+          {/* Site name */}
+          <div className="space-y-2">
+            <Label htmlFor="site-name">Nom du site</Label>
+            <Input
+              id="site-name"
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              placeholder="Mon Super Site"
+            />
+          </div>
+
+          {/* Colors */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Couleur principale</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="h-10 w-10 cursor-pointer rounded border bg-transparent"
+                />
+                <Input
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Couleur d&apos;accent</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  className="h-10 w-10 cursor-pointer rounded border bg-transparent"
+                />
+                <Input
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Affiliates */}
+          <div className="space-y-3">
+            <Label>Programmes d&apos;affiliation</Label>
+            {affiliates.map((affiliate, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  value={affiliate.name}
+                  onChange={(e) => updateAffiliate(index, "name", e.target.value)}
+                  placeholder="Nom du programme"
+                  className="flex-1"
+                />
+                <Input
+                  value={affiliate.url}
+                  onChange={(e) => updateAffiliate(index, "url", e.target.value)}
+                  placeholder="URL d'affiliation"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeAffiliate(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={addAffiliate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter un programme
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* Social */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Twitter / X</Label>
+              <Input
+                value={twitter}
+                onChange={(e) => setTwitter(e.target.value)}
+                placeholder="@handle"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Instagram</Label>
+              <Input
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="@handle"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>LinkedIn</Label>
+              <Input
+                value={linkedin}
+                onChange={(e) => setLinkedin(e.target.value)}
+                placeholder="company/page"
+              />
+            </div>
+          </div>
+
+          {/* AdSense */}
+          <div className="space-y-2">
+            <Label>AdSense ID</Label>
+            <Input
+              value={adsenseId}
+              onChange={(e) => setAdsenseId(e.target.value)}
+              placeholder="ca-pub-1234567890"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  }
+
+  // ─── Progress view ───
   if (creating) {
     const hasErrors = steps.some((s) => s.status === "error");
     const allDone = !loading;
@@ -282,7 +468,7 @@ export default function CreateSitePage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Creation du site</h1>
+          <h1 className="text-2xl font-bold">Création du site</h1>
         </div>
 
         <Card>
@@ -298,14 +484,16 @@ export default function CreateSitePage() {
               </div>
             ))}
 
-            {steps.filter((s) => s.status === "error").map((step) => (
-              <div
-                key={`error-${step.key}`}
-                className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-              >
-                <strong>{step.label.replace("...", "")}</strong>: {step.error}
-              </div>
-            ))}
+            {steps
+              .filter((s) => s.status === "error")
+              .map((step) => (
+                <div
+                  key={`error-${step.key}`}
+                  className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+                >
+                  <strong>{step.label.replace("...", "")}</strong>: {step.error}
+                </div>
+              ))}
           </CardContent>
         </Card>
 
@@ -313,7 +501,7 @@ export default function CreateSitePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                {hasErrors ? "Creation partielle" : "Site cree avec succes !"}
+                {hasErrors ? "Création partielle" : "Site créé avec succès !"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -337,9 +525,13 @@ export default function CreateSitePage() {
               )}
               {result.siteUrl && (
                 <p className="text-sm">
-                  <strong>Vercel :</strong>{" "}
+                  <strong>Site :</strong>{" "}
                   <a
-                    href={result.siteUrl}
+                    href={
+                      result.siteUrl.startsWith("http")
+                        ? result.siteUrl
+                        : `https://${result.siteUrl}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 underline"
@@ -353,11 +545,10 @@ export default function CreateSitePage() {
                   <strong>Articles en queue :</strong> {result.articlesQueued}
                 </p>
               )}
-
               <div className="flex gap-3 pt-2">
                 {result.siteId && (
                   <Button onClick={() => router.push(`/sites/${result.siteId}`)}>
-                    Voir le site
+                    Voir le dashboard
                   </Button>
                 )}
                 {hasErrors && (
@@ -393,352 +584,217 @@ export default function CreateSitePage() {
     );
   }
 
+  // ─── Step 1: Mode selection ───
+  if (!mode) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/sites">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">Nouveau site</h1>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+            onClick={() => setMode("prompt")}
+          >
+            <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Prompt IA</h3>
+              <p className="text-sm text-muted-foreground">
+                Décrivez votre site et l&apos;IA le construit
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+            onClick={() => setMode("repo")}
+          >
+            <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <GitBranch className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Repo Git</h3>
+              <p className="text-sm text-muted-foreground">
+                Connectez un repo GitHub existant
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+            onClick={() => setMode("existing")}
+          >
+            <CardContent className="flex flex-col items-center gap-3 pt-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Globe className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Site existant</h3>
+              <p className="text-sm text-muted-foreground">
+                Ajoutez un site déjà en ligne
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Step 2: Form based on mode ───
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/sites">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold">Create Site</h1>
+        <Button variant="ghost" size="icon" onClick={() => setMode(null)}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-2xl font-bold">
+          {mode === "prompt"
+            ? "Créer avec l'IA"
+            : mode === "repo"
+              ? "Connecter un repo"
+              : "Ajouter un site existant"}
+        </h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* General */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">General</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="My Affiliate Site"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  value={slug}
-                  onChange={(e) => {
-                    setSlug(e.target.value);
-                    setSlugEdited(true);
-                  }}
-                  placeholder="my-affiliate-site"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="domain">Domain</Label>
-                <Input
-                  id="domain"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  placeholder="example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="niche">Niche</Label>
-                <Input
-                  id="niche"
-                  value={niche}
-                  onChange={(e) => setNiche(e.target.value)}
-                  placeholder="tech, health, finance..."
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief description of the site..."
-                rows={3}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Affiliation */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Affiliation</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {affiliates.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No affiliate programs added yet.
-              </p>
-            )}
-            {affiliates.map((affiliate, index) => (
-              <div key={index} className="space-y-3">
-                {index > 0 && <Separator />}
-                <div className="flex items-start gap-2">
-                  <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Program Name</Label>
-                      <Input
-                        value={affiliate.name}
-                        onChange={(e) => updateAffiliateRow(index, "name", e.target.value)}
-                        placeholder="Amazon Associates"
-                      />
+        {/* ─── MODE PROMPT ─── */}
+        {mode === "prompt" && (
+          <>
+            {/* Site type selector */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Type de site</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      { value: "affiliation", label: "Site Affiliation", desc: "Comparatifs, classements, CTA affiliés" },
+                      { value: "media", label: "Site Média", desc: "Articles, catégories, newsletter" },
+                      { value: "libre", label: "Libre", desc: "Structure personnalisée" },
+                    ] as const
+                  ).map((type) => (
+                    <div
+                      key={type.value}
+                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                        siteType === type.value
+                          ? "border-primary bg-primary/5"
+                          : "border-transparent hover:border-muted-foreground/20"
+                      }`}
+                      onClick={() => setSiteType(type.value)}
+                    >
+                      <p className="font-medium">{type.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{type.desc}</p>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">URL</Label>
-                      <Input
-                        value={affiliate.url}
-                        onChange={(e) => updateAffiliateRow(index, "url", e.target.value)}
-                        placeholder="https://affiliate.example.com"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Commission</Label>
-                      <Input
-                        value={affiliate.commission}
-                        onChange={(e) => updateAffiliateRow(index, "commission", e.target.value)}
-                        placeholder="5-10%"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Category</Label>
-                      <Input
-                        value={affiliate.category}
-                        onChange={(e) => updateAffiliateRow(index, "category", e.target.value)}
-                        placeholder="Electronics"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="mt-5 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeAffiliateRow(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  ))}
                 </div>
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={addAffiliateRow}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add program
-            </Button>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Social */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Social</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="instagram">Instagram</Label>
-                <Input
-                  id="instagram"
-                  value={instagram}
-                  onChange={(e) => setInstagram(e.target.value)}
-                  placeholder="@handle"
+            {/* Prompt textarea */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Décrivez votre site</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={PLACEHOLDERS[siteType]}
+                  rows={6}
+                  className="resize-none"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="twitter">Twitter / X</Label>
-                <Input
-                  id="twitter"
-                  value={twitter}
-                  onChange={(e) => setTwitter(e.target.value)}
-                  placeholder="@handle"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn</Label>
-                <Input
-                  id="linkedin"
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                  placeholder="company/page-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pinterest">Pinterest</Label>
-                <Input
-                  id="pinterest"
-                  value={pinterest}
-                  onChange={(e) => setPinterest(e.target.value)}
-                  placeholder="@handle"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tiktok">TikTok</Label>
-                <Input
-                  id="tiktok"
-                  value={tiktok}
-                  onChange={(e) => setTiktok(e.target.value)}
-                  placeholder="@handle"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Plus votre description est détaillée, meilleur sera le résultat.
+                </p>
+              </CardContent>
+            </Card>
 
-        {/* Monetization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Monetization</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="adsense_id">AdSense ID</Label>
-                <Input
-                  id="adsense_id"
-                  value={adsenseId}
-                  onChange={(e) => setAdsenseId(e.target.value)}
-                  placeholder="ca-pub-1234567890"
-                />
-              </div>
-              <div className="flex items-center gap-3 pt-6">
-                <Switch
-                  id="auto_ads"
-                  checked={autoAds}
-                  onCheckedChange={setAutoAds}
-                />
-                <Label htmlFor="auto_ads">Auto Ads</Label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Advanced config */}
+            <Card>
+              <CardContent className="pt-6">{renderAdvancedConfig()}</CardContent>
+            </Card>
+          </>
+        )}
 
-        {/* Newsletter */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Newsletter</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label htmlFor="resend_audience_id">Audience ID</Label>
-              <Input
-                id="resend_audience_id"
-                value={resendAudienceId}
-                onChange={(e) => setResendAudienceId(e.target.value)}
-                placeholder="aud_xxxxxxxx"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Config */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Config</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Articles per day</Label>
-                <span className="font-mono text-sm font-medium">{articlesPerDay}</span>
-              </div>
-              <Slider
-                value={[articlesPerDay]}
-                onValueChange={([v]) => setArticlesPerDay(v)}
-                min={1}
-                max={10}
-                step={1}
-              />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto_social">Auto Social Posting</Label>
-              <Switch
-                id="auto_social"
-                checked={autoSocial}
-                onCheckedChange={setAutoSocial}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto_newsletter">Auto Newsletter</Label>
-              <Switch
-                id="auto_newsletter"
-                checked={autoNewsletter}
-                onCheckedChange={setAutoNewsletter}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Technical */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Technical</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="primary_color">Primary Color</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    id="primary_color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-10 w-10 cursor-pointer rounded border bg-transparent"
-                  />
+        {/* ─── MODE REPO ─── */}
+        {mode === "repo" && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Repository GitHub</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>URL du repo</Label>
                   <Input
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="font-mono"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    placeholder="https://github.com/user/repo"
+                    required
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="accent_color">Accent Color</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    id="accent_color"
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    className="h-10 w-10 cursor-pointer rounded border bg-transparent"
-                  />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">{renderAdvancedConfig()}</CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* ─── MODE EXISTING ─── */}
+        {mode === "existing" && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Site existant</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>URL du site</Label>
                   <Input
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    className="font-mono"
+                    value={siteUrl}
+                    onChange={(e) => setSiteUrl(e.target.value)}
+                    placeholder="https://monsite.com"
+                    required
                   />
                 </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="space-y-2">
+                  <Label>Repo Git (optionnel)</Label>
+                  <Input
+                    value={existingRepo}
+                    onChange={(e) => setExistingRepo(e.target.value)}
+                    placeholder="https://github.com/user/repo"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">{renderAdvancedConfig()}</CardContent>
+            </Card>
+          </>
+        )}
 
         {/* Submit */}
         <div className="flex justify-end gap-3">
-          <Link href="/sites">
-            <Button type="button" variant="outline">
-              Cancel
-            </Button>
-          </Link>
+          <Button type="button" variant="outline" onClick={() => setMode(null)}>
+            Retour
+          </Button>
           <Button type="submit" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                Création...
               </>
             ) : (
-              "Create Site"
+              "Créer le site"
             )}
           </Button>
         </div>

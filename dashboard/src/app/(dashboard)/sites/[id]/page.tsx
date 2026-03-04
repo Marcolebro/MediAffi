@@ -5,8 +5,9 @@ import { getQueue } from "@/lib/queries/queue";
 import { getSocialPosts } from "@/lib/queries/social";
 import { SiteDetailClient } from "@/components/sites/site-detail-client";
 import { Badge } from "@/components/ui/badge";
+import { SiteActions } from "@/components/sites/site-actions";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -69,12 +70,7 @@ export default async function SiteDetailPage({ params }: Props) {
             )}
           </div>
         </div>
-        <Link href={`/sites/${id}/settings`}>
-          <Button variant="outline" size="sm">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
-        </Link>
+        <SiteActions site={site} />
       </div>
 
       {/* Client interactive content */}
