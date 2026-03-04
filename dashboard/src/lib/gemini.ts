@@ -360,14 +360,7 @@ export type GeminiArchitectureResult = {
   dependencies: string[];
 };
 
-export type GeminiLayoutResult = {
-  files: GeminiFile[];
-  dependencies: string[];
-};
-
-export type GeminiPageResult = {
-  files: GeminiFile[];
-};
+// GeminiLayoutResult and GeminiPageResult removed — layout/page generation now uses raw code output per file
 
 const SHARED_CONTEXT = `## STACK TECHNIQUE
 - Next.js 16 (App Router) avec TypeScript strict
@@ -434,7 +427,7 @@ REGLES :
 - Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks`;
 }
 
-export function getLayoutSystemPrompt(siteType: "affiliation" | "media" | "libre"): string {
+export function getFileGenerationSystemPrompt(siteType: "affiliation" | "media" | "libre"): string {
   return `Tu es un développeur frontend senior Next.js 16 + React 19 + TypeScript + Tailwind CSS 4.
 
 ${SHARED_CONTEXT}
@@ -444,62 +437,27 @@ ${getSiteTypeContext(siteType)}
 ${SHARED_RULES}
 
 ## TA TACHE
-Tu génères UNIQUEMENT le layout, les styles globaux, et les composants PARTAGÉS du site.
+Tu génères le CODE COMPLET d'UN SEUL fichier du site.
 
-Fichiers à générer :
-1. **src/app/layout.tsx** — Root layout avec fonts (next/font/google), import globals.css, html lang="fr", Header + Footer wrapping {children}, metadata title/description, ThemeProvider si dark mode
-2. **src/styles/globals.css** — Tailwind CSS 4 + custom styles + animations
-3. **src/components/Header.tsx** — Navigation principale (liens vers les pages du site)
-4. **src/components/Footer.tsx** — Footer du site
-5. **Autres composants partagés** — Ceux listés dans l'architecture fournie (ProductCard, ArticleCard, etc.)
-6. **site-data/products.json** — Données des produits/affiliés
+REGLES CRITIQUES DE FORMAT :
+- Retourne UNIQUEMENT le code source du fichier
+- PAS de JSON wrapper, PAS de backticks markdown, PAS d'explication avant ou après
+- Juste le code brut, prêt à être sauvegardé tel quel
+- La première ligne de ta réponse est la première ligne du fichier (import, "use client", etc.)
 
-NE PAS générer les pages (page.tsx). Uniquement le layout et les composants réutilisables.
-Le Header doit avoir des liens vers TOUTES les pages listées dans l'architecture.
+REGLES TECHNIQUES :
+- Le Header et Footer sont dans le layout.tsx — les pages NE doivent PAS les inclure
+- Utilise les composants partagés via import depuis "@/components/..."
+- Pour article/[slug]/page.tsx : params est un Promise → const { slug } = await params;
+- Chaque page a des metadata via export const metadata ou generateMetadata()
+- Schema.org JSON-LD si pertinent (WebSite sur homepage, Article sur page article)
 
 ### Design
 - Le site doit être BEAU et PROFESSIONNEL — pas un template générique
 - Mobile-first responsive (320px → 1440px)
-- Les cards doivent avoir : ombres, bordures subtiles, hover effects
-- Images placeholder propres (dégradés, icônes) quand pas d'images réelles
-
-## FORMAT DE REPONSE
-{
-  "files": [{ "path": "chemin/relatif/fichier.tsx", "content": "contenu complet du fichier" }],
-  "dependencies": ["package1", "package2"]
-}
-Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks.`;
-}
-
-export function getPageSystemPrompt(): string {
-  return `Tu es un développeur frontend senior Next.js 16 + React 19 + TypeScript + Tailwind CSS 4.
-
-${SHARED_CONTEXT}
-
-${SHARED_RULES}
-
-## TA TACHE
-Tu génères UNE SEULE PAGE du site. Les composants partagés (Header, Footer, etc.) sont déjà dans le layout — NE PAS les recréer. Utilise-les via import depuis "@/components/...".
-
-IMPORTANT:
-- Le Header et Footer sont dans le layout.tsx, NE PAS les inclure dans la page
-- Utilise les composants partagés fournis via import
-- Pour la page article/[slug] : params est un Promise dans Next.js 16 → const { slug } = await params;
-- generateStaticParams() pour les pages dynamiques
-- Chaque page a des metadata (title, description) via export const metadata ou generateMetadata()
-- Schema.org JSON-LD si pertinent (WebSite sur homepage, Article sur page article)
-
-### Design
-- La page doit être visuellement riche et engageante
-- Mobile-first responsive
-- Animations subtiles (hover, transitions)
-- Du VRAI contenu en français
-
-## FORMAT DE REPONSE
-{
-  "files": [{ "path": "chemin/relatif/fichier.tsx", "content": "contenu complet du fichier" }]
-}
-Retourne UNIQUEMENT le JSON valide, sans markdown, sans backticks.`;
+- Animations subtiles (hover, transitions, fade-in)
+- Du VRAI contenu en français (pas de lorem ipsum)
+- Les cards doivent avoir : ombres, bordures subtiles, hover effects`;
 }
 
 export function buildArchitectureUserPrompt(opts: {
@@ -523,26 +481,46 @@ export function buildArchitectureUserPrompt(opts: {
   return parts.join("\n");
 }
 
-export function buildLayoutUserPrompt(
-  opts: {
-    prompt: string;
-    siteName?: string;
-    primaryColor?: string;
-    accentColor?: string;
-    affiliates?: { name: string; url: string }[];
-    social?: { twitter?: string; instagram?: string; linkedin?: string };
-    adsenseId?: string;
-  },
-  architecture: GeminiArchitectureResult
-): string {
+export function buildFileUserPrompt(opts: {
+  filePath: string;
+  fileDescription: string;
+  architecture: GeminiArchitectureResult;
+  sitePrompt: string;
+  siteName?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  affiliates?: { name: string; url: string }[];
+  social?: { twitter?: string; instagram?: string; linkedin?: string };
+  adsenseId?: string;
+}): string {
   const parts: string[] = [];
-  parts.push(`## DESCRIPTION DU SITE\n${opts.prompt}`);
+
+  parts.push(`## FICHIER A GENERER`);
+  parts.push(`Path: ${opts.filePath}`);
+  parts.push(`Description: ${opts.fileDescription}`);
+
+  parts.push(`\n## ARCHITECTURE DU SITE`);
+  parts.push(`Pages :`);
+  for (const page of opts.architecture.pages) {
+    parts.push(`- ${page.title} (${page.slug}) : ${page.description}`);
+  }
+  parts.push(`Composants partagés : ${opts.architecture.shared_components.join(", ")}`);
+  parts.push(`Fonts : heading=${opts.architecture.fonts.heading}, body=${opts.architecture.fonts.body}`);
+
+  parts.push(`\n## LIENS DE NAVIGATION`);
+  for (const page of opts.architecture.pages) {
+    if (page.slug !== "/" && !page.slug.includes("[")) {
+      parts.push(`- "${page.title}" → ${page.slug}`);
+    }
+  }
+
+  parts.push(`\n## DESCRIPTION DU SITE\n${opts.sitePrompt}`);
   if (opts.siteName) parts.push(`\n## NOM DU SITE\n${opts.siteName}`);
   if (opts.primaryColor || opts.accentColor) {
     parts.push(`\n## COULEURS\n- Primary: ${opts.primaryColor || "#3b82f6"}\n- Accent: ${opts.accentColor || "#10b981"}`);
   }
   if (opts.affiliates && opts.affiliates.length > 0) {
-    parts.push(`\n## PROGRAMMES AFFILIES\nGénère le products.json avec ces programmes :`);
+    parts.push(`\n## PROGRAMMES AFFILIES`);
     for (const a of opts.affiliates) parts.push(`- ${a.name}: ${a.url}`);
   }
   if (opts.social) {
@@ -554,43 +532,40 @@ export function buildLayoutUserPrompt(
   }
   if (opts.adsenseId) parts.push(`\n## ADSENSE\nID: ${opts.adsenseId}`);
 
-  parts.push(`\n## ARCHITECTURE DU SITE (déjà planifiée)`);
-  parts.push(`Pages : ${architecture.pages.map((p) => `${p.title} (${p.slug})`).join(", ")}`);
-  parts.push(`Composants partagés à générer : ${architecture.shared_components.join(", ")}`);
-  parts.push(`Fonts : heading=${architecture.fonts.heading}, body=${architecture.fonts.body}`);
-
-  parts.push(`\n## LIENS DE NAVIGATION POUR LE HEADER`);
-  for (const page of architecture.pages) {
-    if (page.slug !== "/" && !page.slug.includes("[")) {
-      parts.push(`- "${page.title}" → ${page.slug}`);
-    }
-  }
-
-  parts.push(`\nGénère le layout, globals.css, Header, Footer, les composants partagés listés ci-dessus, et products.json.`);
+  parts.push(`\nGénère UNIQUEMENT le code du fichier ${opts.filePath}. Pas de JSON, pas de backticks, pas d'explication.`);
   return parts.join("\n");
 }
 
-export function buildPageUserPrompt(
-  page: GeminiArchitecturePage,
-  architecture: GeminiArchitectureResult,
-  sharedComponentNames: string[]
-): string {
-  const parts: string[] = [];
-  parts.push(`## PAGE A GENERER`);
-  parts.push(`- Slug: ${page.slug}`);
-  parts.push(`- Titre: ${page.title}`);
-  parts.push(`- Description: ${page.description}`);
-  parts.push(`- Composants à utiliser: ${page.components_needed.join(", ")}`);
+export function stripCodeFences(raw: string): string {
+  return raw
+    .replace(/^```(?:\w+)?\s*\n?/gm, "")
+    .replace(/\n?```\s*$/gm, "")
+    .trim();
+}
 
-  parts.push(`\n## CONTEXTE DU SITE`);
-  parts.push(`Pages du site : ${architecture.pages.map((p) => `${p.title} (${p.slug})`).join(", ")}`);
-  parts.push(`Fonts : heading=${architecture.fonts.heading}, body=${architecture.fonts.body}`);
+export function slugToFilePath(slug: string): string {
+  if (slug === "/") return "src/app/page.tsx";
+  const clean = slug.startsWith("/") ? slug.slice(1) : slug;
+  return `src/app/${clean}/page.tsx`;
+}
 
-  parts.push(`\n## COMPOSANTS PARTAGÉS DISPONIBLES (déjà générés, utilise-les via import)`);
-  for (const name of sharedComponentNames) {
-    parts.push(`- import { ... } from "@/components/${name}"`);
+export function getLayoutFilePaths(arch: GeminiArchitectureResult): { path: string; description: string }[] {
+  const files: { path: string; description: string }[] = [
+    { path: "src/app/layout.tsx", description: `Root layout avec fonts (${arch.fonts.heading}/${arch.fonts.body}), import globals.css, html lang="fr", Header + Footer wrapping {children}, metadata title/description` },
+    { path: "src/styles/globals.css", description: "Tailwind CSS 4 + custom styles + animations + variables de couleurs du site" },
+  ];
+
+  for (const comp of arch.shared_components) {
+    const desc =
+      comp === "Header"
+        ? "Navigation principale avec liens vers toutes les pages du site, responsive avec menu mobile"
+        : comp === "Footer"
+          ? "Footer du site avec liens utiles, réseaux sociaux, copyright"
+          : `Composant réutilisable ${comp} utilisé dans plusieurs pages`;
+    files.push({ path: `src/components/${comp}.tsx`, description: desc });
   }
 
-  parts.push(`\nGénère UNIQUEMENT les fichiers pour la page "${page.title}" (${page.slug}).`);
-  return parts.join("\n");
+  files.push({ path: "site-data/products.json", description: "Fichier JSON avec les données des produits/affiliés : name, slug, affiliate_slug, url, bonus, rating, pros, cons, category" });
+
+  return files;
 }

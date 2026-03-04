@@ -5,19 +5,19 @@ import { Octokit } from "octokit";
 import fs from "fs/promises";
 import path from "path";
 import {
+  callGemini,
   callGeminiJSON,
   getArchitectureSystemPrompt,
-  getLayoutSystemPrompt,
-  getPageSystemPrompt,
+  getFileGenerationSystemPrompt,
   buildArchitectureUserPrompt,
-  buildLayoutUserPrompt,
-  buildPageUserPrompt,
+  buildFileUserPrompt,
+  stripCodeFences,
+  slugToFilePath,
+  getLayoutFilePaths,
   ARTICLE_IDEAS_SYSTEM_PROMPT,
   buildArticleIdeasPrompt,
   type GeminiGenerateResult,
   type GeminiArchitectureResult,
-  type GeminiLayoutResult,
-  type GeminiPageResult,
   type GeminiFile,
 } from "@/lib/gemini";
 
@@ -265,43 +265,53 @@ async function handlePromptMode(
     });
   }
 
-  // Step 2b — Layout + shared components (~20s)
-  let layoutResult: GeminiLayoutResult | null = null;
+  // Step 2b — Layout + shared components (one raw-code call per file, batched by 3)
+  const layoutFiles: GeminiFile[] = [];
   if (architecture) {
     try {
-      const layoutSystemPrompt = getLayoutSystemPrompt(siteType);
-      const layoutUserPrompt = buildLayoutUserPrompt(
-        {
-          prompt: userPrompt,
-          siteName,
-          primaryColor: body.primary_color,
-          accentColor: body.accent_color,
-          affiliates: validAffiliates,
-          social: {
-            twitter: body.twitter,
-            instagram: body.instagram,
-            linkedin: body.linkedin,
-          },
-          adsenseId: body.adsense_id,
-        },
-        architecture
-      );
+      const fileSystemPrompt = getFileGenerationSystemPrompt(siteType);
+      const filesToGenerate = getLayoutFilePaths(architecture);
+      const BATCH_SIZE = 3;
 
-      layoutResult = await callGeminiJSON<GeminiLayoutResult>(
-        layoutSystemPrompt,
-        layoutUserPrompt,
-        { maxOutputTokens: 32768, retries: 2 }
-      );
+      const sharedOpts = {
+        architecture: architecture!,
+        sitePrompt: userPrompt,
+        siteName,
+        primaryColor: body.primary_color,
+        accentColor: body.accent_color,
+        affiliates: validAffiliates,
+        social: { twitter: body.twitter, instagram: body.instagram, linkedin: body.linkedin },
+        adsenseId: body.adsense_id,
+      };
 
-      if (!layoutResult?.files || layoutResult.files.length === 0) {
-        throw new Error("Gemini returned no layout files");
+      for (let i = 0; i < filesToGenerate.length; i += BATCH_SIZE) {
+        const batch = filesToGenerate.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+          batch.map(async (file) => {
+            const filePrompt = buildFileUserPrompt({
+              filePath: file.path,
+              fileDescription: file.description,
+              ...sharedOpts,
+            });
+            const raw = await callGemini(fileSystemPrompt, filePrompt, { maxOutputTokens: 16384 });
+            return { path: file.path, content: stripCodeFences(raw) };
+          })
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j];
+          const file = batch[j];
+          if (result.status === "fulfilled") {
+            layoutFiles.push(result.value);
+            send({ step: "generate_layout", status: "progress", message: `${file.path.split("/").pop()} OK` });
+          } else {
+            send({ step: "generate_layout", status: "progress", message: `${file.path.split("/").pop()} — erreur` });
+          }
+        }
       }
 
-      send({
-        step: "generate_layout",
-        status: "done",
-        filesCount: layoutResult.files.length,
-      });
+      send({ step: "generate_layout", status: "done", filesCount: layoutFiles.length });
     } catch (err) {
       send({
         step: "generate_layout",
@@ -313,61 +323,53 @@ async function handlePromptMode(
     send({ step: "generate_layout", status: "error", error: "Skipped: no architecture" });
   }
 
-  // Step 2c — Pages (batched, max 3 concurrent, ~10-20s each)
+  // Step 2c — Pages (one raw-code call per page, batched by 3)
   const pageFiles: GeminiFile[] = [];
   if (architecture) {
     try {
-      const pageSystemPrompt = getPageSystemPrompt();
-      const sharedComponentNames = (layoutResult?.files || [])
-        .filter((f) => f.path.startsWith("src/components/"))
-        .map((f) => f.path.replace("src/components/", "").replace(/\.tsx?$/, ""));
-
-      const pagesToGenerate = architecture.pages;
+      const fileSystemPrompt = getFileGenerationSystemPrompt(siteType);
       const BATCH_SIZE = 3;
 
-      for (let i = 0; i < pagesToGenerate.length; i += BATCH_SIZE) {
-        const batch = pagesToGenerate.slice(i, i + BATCH_SIZE);
+      const sharedOpts = {
+        architecture: architecture!,
+        sitePrompt: userPrompt,
+        siteName,
+        primaryColor: body.primary_color,
+        accentColor: body.accent_color,
+        affiliates: validAffiliates,
+        social: { twitter: body.twitter, instagram: body.instagram, linkedin: body.linkedin },
+        adsenseId: body.adsense_id,
+      };
+
+      for (let i = 0; i < architecture.pages.length; i += BATCH_SIZE) {
+        const batch = architecture.pages.slice(i, i + BATCH_SIZE);
 
         const results = await Promise.allSettled(
           batch.map(async (page) => {
-            const pageUserPrompt = buildPageUserPrompt(
-              page,
-              architecture!,
-              sharedComponentNames
-            );
-            return callGeminiJSON<GeminiPageResult>(
-              pageSystemPrompt,
-              pageUserPrompt,
-              { maxOutputTokens: 16384, retries: 2 }
-            );
+            const filePath = slugToFilePath(page.slug);
+            const filePrompt = buildFileUserPrompt({
+              filePath,
+              fileDescription: `Page "${page.title}": ${page.description}. Composants à utiliser: ${page.components_needed.join(", ")}`,
+              ...sharedOpts,
+            });
+            const raw = await callGemini(fileSystemPrompt, filePrompt, { maxOutputTokens: 16384 });
+            return { path: filePath, content: stripCodeFences(raw) };
           })
         );
 
         for (let j = 0; j < results.length; j++) {
           const result = results[j];
           const page = batch[j];
-          if (result.status === "fulfilled" && result.value?.files) {
-            pageFiles.push(...result.value.files);
-            send({
-              step: "generate_pages",
-              status: "progress",
-              message: `${page.title} OK`,
-            });
+          if (result.status === "fulfilled") {
+            pageFiles.push(result.value);
+            send({ step: "generate_pages", status: "progress", message: `${page.title} OK` });
           } else {
-            send({
-              step: "generate_pages",
-              status: "progress",
-              message: `${page.title} — erreur`,
-            });
+            send({ step: "generate_pages", status: "progress", message: `${page.title} — erreur` });
           }
         }
       }
 
-      send({
-        step: "generate_pages",
-        status: "done",
-        filesCount: pageFiles.length,
-      });
+      send({ step: "generate_pages", status: "done", filesCount: pageFiles.length });
     } catch (err) {
       send({
         step: "generate_pages",
@@ -379,13 +381,10 @@ async function handlePromptMode(
     send({ step: "generate_pages", status: "error", error: "Skipped: no architecture" });
   }
 
-  // Merge all generated files into the expected format
+  // Merge all generated files
   {
-    const allFiles = [...(layoutResult?.files || []), ...pageFiles];
-    const allDeps = [
-      ...(layoutResult?.dependencies || []),
-      ...(architecture?.dependencies || []),
-    ];
+    const allFiles = [...layoutFiles, ...pageFiles];
+    const allDeps = architecture?.dependencies || [];
 
     if (allFiles.length > 0) {
       generatedFiles = {
