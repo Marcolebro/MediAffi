@@ -167,7 +167,8 @@ export default function CreateSitePage() {
   // Saved from generate step for retry
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const architectureRef = useRef<any>(null);
-  const filesToGenerateRef = useRef<{ path: string; description: string }[]>([]);
+  const layoutFilesRef = useRef<{ path: string; description: string }[]>([]);
+  const pageFilesRef = useRef<{ path: string; description: string }[]>([]);
 
   // Progress
   const [steps, setSteps] = useState<Step[]>([]);
@@ -425,7 +426,8 @@ export default function CreateSitePage() {
       }
       const data = await res.json();
       architectureRef.current = data.architecture;
-      filesToGenerateRef.current = data.filesToGenerate;
+      layoutFilesRef.current = data.layoutFiles;
+      pageFilesRef.current = data.pageFiles;
 
       updateStepStatus("generate_arch", "done");
       setSteps((prev) =>
@@ -486,20 +488,83 @@ export default function CreateSitePage() {
     config: ReturnType<typeof buildGenerateConfig>,
     signal: AbortSignal
   ) {
-    const files = filesToGenerateRef.current;
+    const layoutFiles = layoutFilesRef.current;
+    const pageFiles = pageFilesRef.current;
+    const allFiles = [...layoutFiles, ...pageFiles];
+    const totalCount = allFiles.length;
+
+    // Collected during layout phase, passed to page phase
+    const availableComponents: { path: string; exports: string[] }[] = [];
+    let productsJson = "";
 
     try {
-      for (let i = 0; i < files.length; i++) {
+      // Phase 1 — Layout + shared components
+      for (let i = 0; i < layoutFiles.length; i++) {
         if (aborted) return;
-
-        const file = files[i];
+        const file = layoutFiles[i];
         const fileName = file.path.split("/").pop();
-        const isLast = i === files.length - 1;
 
         setSteps((prev) =>
           prev.map((s) =>
             s.key === "generate_files"
-              ? { ...s, status: "in_progress", detail: `${i + 1}/${files.length} — ${fileName}...` }
+              ? { ...s, status: "in_progress", detail: `${i + 1}/${totalCount} — ${fileName}...` }
+              : s
+          )
+        );
+
+        const res = await fetch("/api/create-site/generate-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            siteId,
+            filePath: file.path,
+            fileDescription: file.description,
+            siteType,
+            architecture: architectureRef.current,
+            sitePrompt: prompt.trim(),
+            config,
+          }),
+          signal,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(err.error || `Erreur ${fileName}`);
+        }
+
+        const data = await res.json();
+
+        // Collect component exports for page generation
+        if (file.path.startsWith("src/components/") && data.exports?.length > 0) {
+          availableComponents.push({ path: file.path, exports: data.exports });
+        }
+        // Collect products.json content
+        if (file.path === "site-data/products.json") {
+          productsJson = data.content;
+        }
+
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.key === "generate_files"
+              ? { ...s, detail: `${i + 1}/${totalCount} — ${fileName} OK` }
+              : s
+          )
+        );
+      }
+
+      // Phase 2 — Pages (with component context)
+      const offset = layoutFiles.length;
+      for (let i = 0; i < pageFiles.length; i++) {
+        if (aborted) return;
+        const file = pageFiles[i];
+        const fileName = file.path.split("/").pop();
+        const globalIdx = offset + i + 1;
+        const isLast = i === pageFiles.length - 1;
+
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.key === "generate_files"
+              ? { ...s, detail: `${globalIdx}/${totalCount} — ${fileName}...` }
               : s
           )
         );
@@ -516,6 +581,8 @@ export default function CreateSitePage() {
             sitePrompt: prompt.trim(),
             config,
             finalize: isLast,
+            availableComponents,
+            productsJson: productsJson || undefined,
           }),
           signal,
         });
@@ -528,7 +595,7 @@ export default function CreateSitePage() {
         setSteps((prev) =>
           prev.map((s) =>
             s.key === "generate_files"
-              ? { ...s, detail: `${i + 1}/${files.length} — ${fileName} OK` }
+              ? { ...s, detail: `${globalIdx}/${totalCount} — ${fileName} OK` }
               : s
           )
         );
@@ -538,7 +605,7 @@ export default function CreateSitePage() {
       setSteps((prev) =>
         prev.map((s) =>
           s.key === "generate_files"
-            ? { ...s, detail: `${files.length} fichiers générés` }
+            ? { ...s, detail: `${totalCount} fichiers générés` }
             : s
         )
       );
@@ -659,7 +726,8 @@ export default function CreateSitePage() {
         }
         const data = await res.json();
         architectureRef.current = data.architecture;
-        filesToGenerateRef.current = data.filesToGenerate;
+        layoutFilesRef.current = data.layoutFiles;
+        pageFilesRef.current = data.pageFiles;
         updateStepStatus("generate_arch", "done");
         markNextInProgress("generate_arch");
 

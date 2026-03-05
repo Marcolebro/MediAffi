@@ -79,8 +79,6 @@ export async function POST(request: Request) {
       path: slugToFilePath(page.slug),
       description: `Page "${page.title}": ${page.description}. Composants à utiliser: ${page.components_needed.join(", ")}`,
     }));
-    const filesToGenerate = [...layoutFiles, ...pageFiles];
-
     // Initialize generated_files in DB (empty files array, dependencies + sitemap already set)
     const generatedFilesData = {
       files: [],
@@ -95,7 +93,7 @@ export async function POST(request: Request) {
       generated_files: generatedFilesData as any,
     } as Record<string, unknown>);
 
-    return Response.json({ architecture, filesToGenerate });
+    return Response.json({ architecture, layoutFiles, pageFiles });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : "Failed to plan architecture" },

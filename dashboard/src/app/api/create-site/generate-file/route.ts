@@ -5,7 +5,9 @@ import {
   getFileGenerationSystemPrompt,
   buildFileUserPrompt,
   stripCodeFences,
+  extractExports,
   type GeminiArchitectureResult,
+  type AvailableComponent,
 } from "@/lib/gemini";
 
 export const runtime = "nodejs";
@@ -27,6 +29,8 @@ type GenerateFileBody = {
     adsenseId?: string;
   };
   finalize?: boolean;
+  availableComponents?: AvailableComponent[];
+  productsJson?: string;
 };
 
 export async function POST(request: Request) {
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const body: GenerateFileBody = await request.json();
-  const { siteId, filePath, fileDescription, siteType, architecture, sitePrompt, config, finalize } = body;
+  const { siteId, filePath, fileDescription, siteType, architecture, sitePrompt, config, finalize, availableComponents, productsJson } = body;
 
   if (!siteId || !filePath || !fileDescription || !siteType || !architecture || !sitePrompt) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
@@ -67,6 +71,8 @@ export async function POST(request: Request) {
       affiliates: config?.affiliates,
       social: config?.social,
       adsenseId: config?.adsenseId,
+      availableComponents,
+      productsJson,
     });
 
     const { text } = await callAI({
@@ -101,7 +107,9 @@ export async function POST(request: Request) {
 
     await updateSite(supabase, siteId, updates);
 
-    return Response.json({ path: filePath, content });
+    const exports = extractExports(content);
+
+    return Response.json({ path: filePath, content, exports });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : `Failed to generate ${filePath}` },

@@ -122,6 +122,7 @@ Retourne un JSON avec cette structure EXACTE :
 - Le code doit passer npm run build sans erreur
 - CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
 - CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.
+- RÈGLE ABSOLUE IMPORTS : N'importe JAMAIS un fichier qui n'est pas dans la liste des composants disponibles fournie. Si tu as besoin d'un composant supplémentaire, définis-le dans le même fichier.
 
 ## CONTENU
 - Écris tout le contenu en français
@@ -294,7 +295,8 @@ const SHARED_RULES = `## REGLES
 - CTA affiliés via /go/{affiliate_slug} avec rel="nofollow sponsored"
 - Le code doit passer npm run build sans erreur
 - CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
-- CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.`;
+- CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.
+- RÈGLE ABSOLUE IMPORTS : N'importe JAMAIS un fichier qui n'est pas dans la liste des composants disponibles fournie. Si tu as besoin d'un composant supplémentaire, définis-le dans le même fichier.`;
 
 function getSiteTypeContext(siteType: "affiliation" | "media" | "libre"): string {
   if (siteType === "affiliation") return SITE_TYPE_AFFILIATION;
@@ -385,6 +387,11 @@ export function buildArchitectureUserPrompt(opts: {
   return parts.join("\n");
 }
 
+export type AvailableComponent = {
+  path: string;
+  exports: string[];
+};
+
 export function buildFileUserPrompt(opts: {
   filePath: string;
   fileDescription: string;
@@ -396,6 +403,8 @@ export function buildFileUserPrompt(opts: {
   affiliates?: { name: string; url: string }[];
   social?: { twitter?: string; instagram?: string; linkedin?: string };
   adsenseId?: string;
+  availableComponents?: AvailableComponent[];
+  productsJson?: string;
 }): string {
   const parts: string[] = [];
 
@@ -410,6 +419,26 @@ export function buildFileUserPrompt(opts: {
   }
   parts.push(`Composants partagés : ${opts.architecture.shared_components.join(", ")}`);
   parts.push(`Fonts : heading=${opts.architecture.fonts.heading}, body=${opts.architecture.fonts.body}`);
+
+  // Available components (passed when generating pages, after layout/components are done)
+  if (opts.availableComponents && opts.availableComponents.length > 0) {
+    parts.push(`\n## COMPOSANTS DISPONIBLES À IMPORTER`);
+    parts.push(`Voici les composants déjà générés que tu peux importer. Utilise EXACTEMENT ces noms et ces chemins :`);
+    for (const comp of opts.availableComponents) {
+      const exportsList = comp.exports.join(", ");
+      const importPath = comp.path.replace(/^src\//, "@/").replace(/\.tsx$/, "");
+      parts.push(`- ${comp.path} → ${exportsList} (import { ${comp.exports.map(e => e.replace(/^export\s+(async\s+)?(?:function|const|class)\s+/, "")).join(", ")} } from "${importPath}")`);
+    }
+    parts.push(`Tu peux aussi créer des composants inline directement dans le fichier si tu as besoin de quelque chose de custom.`);
+    parts.push(`INTERDIT : n'importe AUCUN composant depuis @/components/ qui n'est pas dans cette liste. Si tu en as besoin, définis-le dans ce fichier.`);
+  }
+
+  // Products data (passed when generating pages)
+  if (opts.productsJson) {
+    parts.push(`\n## DONNÉES PRODUCTS.JSON`);
+    parts.push(`Voici le contenu exact de site-data/products.json. Utilise ces slugs et données :`);
+    parts.push(opts.productsJson);
+  }
 
   parts.push(`\n## LIENS DE NAVIGATION`);
   for (const page of opts.architecture.pages) {
@@ -438,6 +467,16 @@ export function buildFileUserPrompt(opts: {
 
   parts.push(`\nGénère UNIQUEMENT le code du fichier ${opts.filePath}. Pas de JSON, pas de backticks, pas d'explication.`);
   return parts.join("\n");
+}
+
+export function extractExports(content: string): string[] {
+  const exports: string[] = [];
+  const regex = /^export\s+(?:async\s+)?(?:function|const|class)\s+\w+/gm;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    exports.push(match[0]);
+  }
+  return exports;
 }
 
 export function stripCodeFences(raw: string): string {
