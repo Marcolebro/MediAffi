@@ -231,6 +231,41 @@ function autoFixDuplicateExports(content: string): string {
   return result;
 }
 
+/** layout.tsx and page.tsx MUST have export default — Next.js requirement */
+function autoFixDefaultExport(filePath: string, content: string): string {
+  // Only applies to layout.tsx and page.tsx files
+  const basename = filePath.split("/").pop() || "";
+  if (basename !== "layout.tsx" && basename !== "page.tsx") return content;
+
+  // Already has export default → nothing to do
+  if (/export\s+default\s/.test(content)) return content;
+
+  // Try: export function X / export async function X → export default function X
+  let replaced = false;
+  const result = content.replace(
+    /export\s+(async\s+)?function\s+/,
+    (_match, asyncKw) => {
+      if (replaced) return _match;
+      replaced = true;
+      return `export default ${asyncKw || ""}function `;
+    }
+  );
+
+  if (replaced) return result;
+
+  // Try: export const X = → const X = ... + append export default X
+  const constMatch = content.match(/export\s+const\s+(\w+)\s*=/);
+  if (constMatch) {
+    const name = constMatch[1];
+    return content.replace(
+      /export\s+const\s+/,
+      "const "
+    ) + `\nexport default ${name};\n`;
+  }
+
+  return content;
+}
+
 /** Apply all mechanical fixes to a single file */
 function autoFix(filePath: string, content: string): string {
   let result = content;
@@ -241,6 +276,7 @@ function autoFix(filePath: string, content: string): string {
     result = autoFixUseClient(result);
     result = autoFixTrackAffiliateClick(result);
     result = autoFixDuplicateExports(result);
+    result = autoFixDefaultExport(filePath, result);
   }
 
   return result;
