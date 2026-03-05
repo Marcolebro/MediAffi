@@ -1,4 +1,4 @@
-import { getAllArticles } from "@/lib/content";
+import { getAllArticles } from "@/lib/articles";
 import { ArticleCard } from "./ArticleCard";
 
 interface ArticleGridProps {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getArticleBySlug, getAllArticles } from "@/lib/content";
+import { getArticleBySlug, getAllArticles } from "@/lib/articles";
 import { ArticleLayout } from "@/components/content/ArticleLayout";
 import { SchemaOrg } from "@/components/seo/SchemaOrg";
 import { buildMetadata } from "@/components/seo/OpenGraph";

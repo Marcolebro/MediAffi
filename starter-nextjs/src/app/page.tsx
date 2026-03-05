@@ -1,5 +1,5 @@
 import config from "@/lib/config";
-import { getPageContent } from "@/lib/content";
+import { getPageContent } from "@/lib/articles";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MDXRenderer } from "@/components/mdx/MDXRenderer";

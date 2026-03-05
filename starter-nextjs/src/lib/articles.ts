@@ -61,6 +61,11 @@ export function getArticleBySlug(slug: string): ArticleContent | null {
   }
 }
 
+/** Alias of getArticleBySlug — referenced in generated code */
+export function getArticle(slug: string): ArticleContent | null {
+  return getArticleBySlug(slug);
+}
+
 export function getAllArticles(): ArticleMeta[] {
   try {
     if (!fs.existsSync(ARTICLES_DIR)) return [];
@@ -84,6 +89,24 @@ export function getAllArticles(): ArticleMeta[] {
         };
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch {
+    return [];
+  }
+}
+
+/** Filter articles by category */
+export function getArticlesByCategory(category: string): ArticleMeta[] {
+  return getAllArticles().filter((a) => a.category === category);
+}
+
+/** Return all article slugs (for generateStaticParams) */
+export function getArticleSlugs(): string[] {
+  try {
+    if (!fs.existsSync(ARTICLES_DIR)) return [];
+    return fs
+      .readdirSync(ARTICLES_DIR)
+      .filter((f) => f.endsWith(".mdx"))
+      .map((f) => f.replace(/\.mdx$/, ""));
   } catch {
     return [];
   }

@@ -60,6 +60,7 @@ const STEPS_PROMPT: Omit<Step, "status">[] = [
   { key: "supabase", label: "Création du site en base..." },
   { key: "generate_arch", label: "Planification de l'architecture..." },
   { key: "generate_files", label: "Génération des fichiers..." },
+  { key: "validate", label: "Validation du code..." },
   { key: "github", label: "Push vers GitHub..." },
   { key: "vercel", label: "Déploiement Vercel..." },
   { key: "articles", label: "Génération de 50 idées d'articles..." },
@@ -452,7 +453,23 @@ export default function CreateSitePage() {
 
     if (aborted) return;
 
-    // Step 4 — Deploy (GitHub + Vercel)
+    // Step 4 — Validate generated code
+    try {
+      await streamEndpoint(
+        "/api/create-site/validate",
+        { siteId },
+        handleStreamEvent,
+        signal
+      );
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setFailedStep("validate");
+      throw err;
+    }
+
+    if (aborted) return;
+
+    // Step 5 — Deploy (GitHub + Vercel)
     try {
       await streamEndpoint(
         "/api/create-site/deploy",
@@ -468,7 +485,7 @@ export default function CreateSitePage() {
 
     if (aborted) return;
 
-    // Step 5 — Articles
+    // Step 6 — Articles
     try {
       await streamEndpoint(
         "/api/create-site/articles",
@@ -713,7 +730,7 @@ export default function CreateSitePage() {
 
     try {
       if (failedStep === "generate_arch") {
-        // Re-do architecture + all files + deploy + articles
+        // Re-do architecture + all files + validate + deploy + articles
         const res = await fetch("/api/create-site/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -734,12 +751,22 @@ export default function CreateSitePage() {
         if (aborted) return;
         await generateFilesSequentially(siteId, config, signal);
         if (aborted) return;
+        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
       } else if (failedStep === "generate_files") {
-        // Architecture already done, re-generate all files
+        // Architecture already done, re-generate all files + validate + deploy + articles
         await generateFilesSequentially(siteId, config, signal);
+        if (aborted) return;
+        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
+        await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
+        if (aborted) return;
+        await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
+      } else if (failedStep === "validate") {
+        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;

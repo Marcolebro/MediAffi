@@ -27,7 +27,7 @@ const BASE_SYSTEM_PROMPT = `Tu es un développeur frontend senior spécialisé N
 ## INFRASTRUCTURE EXISTANTE (NE PAS recréer, NE PAS écraser)
 Les fichiers suivants existent déjà dans le projet et sont disponibles à l'import. Tu ne dois JAMAIS générer de fichier avec ces chemins :
 - src/lib/products.ts — import { getProduct, getAllProducts, getProductsByCategory } from "@/lib/products". Lit site-data/products.json
-- src/lib/articles.ts — import { getAllArticles, getArticle, getArticlesByCategory, getArticleSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
+- src/lib/articles.ts — Exports : getArticle(slug), getArticleBySlug(slug), getArticlesByCategory(category), getArticleSlugs(), getAllArticles(), getPageContent(slug), getAllPageSlugs(), types ArticleMeta, ArticleContent, PageContent. Import { getAllArticles, getArticle, getArticleBySlug, getArticlesByCategory, getArticleSlugs, getPageContent, getAllPageSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
 - src/lib/supabase.ts — import { supabase, trackAffiliateClick } from "@/lib/supabase". Client Supabase
 - src/lib/utils.ts — import { cn, formatDate, slugify } from "@/lib/utils"
 - src/app/go/[slug]/route.ts — redirect affilié. Tous les CTA d'affiliation doivent pointer vers /go/{product.affiliate_slug}
@@ -118,6 +118,9 @@ Retourne un JSON avec cette structure EXACTE :
 ### Code
 - TypeScript strict, aucun any
 - Server Components par défaut, "use client" uniquement quand nécessaire (interactivité, hooks, event handlers)
+- DIRECTIVE "use client" : Tout fichier qui utilise useState, useEffect, useRef, useCallback, useMemo ou des event handlers (onClick, onChange, onSubmit) DOIT commencer par "use client" en première ligne.
+- PAS D'IMPORT REACT : N'utilise JAMAIS "import React from 'react'" — React 19 n'en a pas besoin.
+- SYNTAXE INTERFACE : Les interfaces TypeScript s'écrivent "interface Name {" (sans mot supplémentaire entre le nom et l'accolade).
 - Aucun crash si products.json est vide ou si content/articles/ est vide
 - Aucun import de fichier qui n'existe pas
 - Le code doit passer npm run build sans erreur
@@ -278,7 +281,7 @@ const SHARED_CONTEXT = `## STACK TECHNIQUE
 ## INFRASTRUCTURE EXISTANTE (NE PAS recréer, NE PAS écraser)
 Les fichiers suivants existent déjà dans le projet et sont disponibles à l'import. Tu ne dois JAMAIS générer de fichier avec ces chemins :
 - src/lib/products.ts — import { getProduct, getAllProducts, getProductsByCategory } from "@/lib/products". Lit site-data/products.json
-- src/lib/articles.ts — import { getAllArticles, getArticle, getArticlesByCategory, getArticleSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
+- src/lib/articles.ts — Exports : getArticle(slug), getArticleBySlug(slug), getArticlesByCategory(category), getArticleSlugs(), getAllArticles(), getPageContent(slug), getAllPageSlugs(), types ArticleMeta, ArticleContent, PageContent. Import { getAllArticles, getArticle, getArticleBySlug, getArticlesByCategory, getArticleSlugs, getPageContent, getAllPageSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
 - src/lib/supabase.ts — import { supabase, trackAffiliateClick } from "@/lib/supabase". Client Supabase
 - src/lib/utils.ts — import { cn, formatDate, slugify } from "@/lib/utils"
 - src/app/go/[slug]/route.ts — redirect affilié. CTA d'affiliation → /go/{product.affiliate_slug}
@@ -303,7 +306,10 @@ const SHARED_RULES = `## REGLES
 - Le code doit passer npm run build sans erreur
 - CRITIQUE : Toujours utiliser l'optional chaining avant .map(), .filter(), .forEach(). Exemple : products?.map(...) ou (products || []).map(...). Ne JAMAIS appeler .map() directement sur une variable qui pourrait être undefined.
 - CRITIQUE EXPORTS : Utilise TOUJOURS des named exports (export function Component() ou export const Component =). N'utilise JAMAIS export default. Les imports doivent correspondre : import { Component } from './Component'. Avant de référencer un composant dans une page, vérifie qu'il existe dans la liste des fichiers générés.
-- RÈGLE ABSOLUE IMPORTS : N'importe JAMAIS un fichier qui n'est pas dans la liste des composants disponibles fournie. Si tu as besoin d'un composant supplémentaire, définis-le dans le même fichier.`;
+- RÈGLE ABSOLUE IMPORTS : N'importe JAMAIS un fichier qui n'est pas dans la liste des composants disponibles fournie. Si tu as besoin d'un composant supplémentaire, définis-le dans le même fichier.
+- DIRECTIVE "use client" : Tout fichier qui utilise useState, useEffect, useRef, useCallback, useMemo ou des event handlers (onClick, onChange, onSubmit) DOIT commencer par "use client" en première ligne.
+- SYNTAXE INTERFACE : Les interfaces TypeScript s'écrivent "interface Name {" (sans mot supplémentaire entre le nom et l'accolade). Pas "interface Foo bar {".
+- PAS D'IMPORT REACT : N'utilise JAMAIS "import React from 'react'" — React 19 n'en a pas besoin. Les JSX fonctionnent sans cet import.`;
 
 function getSiteTypeContext(siteType: "affiliation" | "media" | "libre"): string {
   if (siteType === "affiliation") return SITE_TYPE_AFFILIATION;

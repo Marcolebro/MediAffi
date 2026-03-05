@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ArticleMeta } from "@/lib/content";
+import type { ArticleMeta } from "@/lib/articles";
 
 interface SidebarProps {
   popularArticles?: ArticleMeta[];

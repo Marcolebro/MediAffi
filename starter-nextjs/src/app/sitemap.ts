@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import config from "@/lib/config";
-import { getAllArticles } from "@/lib/content";
+import { getAllArticles } from "@/lib/articles";
 import pagesConfig from "../../site-data/pages-config.json";
 
 export default function sitemap(): MetadataRoute.Sitemap {

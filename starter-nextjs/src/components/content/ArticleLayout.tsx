@@ -7,7 +7,7 @@ import { Breadcrumb } from "@/components/seo/Breadcrumb";
 import { TOC } from "./TOC";
 import { Rating } from "@/components/business/Rating";
 import { MDXRenderer } from "@/components/mdx/MDXRenderer";
-import { getAllArticles, type ArticleContent } from "@/lib/content";
+import { getAllArticles, type ArticleContent } from "@/lib/articles";
 
 interface ArticleLayoutProps {
   article: ArticleContent;
