@@ -453,14 +453,9 @@ export default function CreateSitePage() {
 
     if (aborted) return;
 
-    // Step 4 — Validate generated code
+    // Step 4 — Validate & fix generated code (client-orchestrated)
     try {
-      await streamEndpoint(
-        "/api/create-site/validate",
-        { siteId },
-        handleStreamEvent,
-        signal
-      );
+      await validateAndFix(siteId, signal);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setFailedStep("validate");
@@ -635,6 +630,130 @@ export default function CreateSitePage() {
     }
   }
 
+  async function validateAndFix(siteId: string, signal: AbortSignal) {
+    const MAX_ITERATIONS = 3;
+
+    for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
+      if (signal.aborted) return;
+
+      // Call validate (pure check, no AI, fast)
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.key === "validate"
+            ? {
+                ...s,
+                status: "in_progress" as StepStatus,
+                detail: iteration === 1
+                  ? "Vérification du code..."
+                  : `Re-vérification (itération ${iteration})...`,
+              }
+            : s
+        )
+      );
+
+      const validateRes = await fetch("/api/create-site/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteId }),
+        signal,
+      });
+
+      if (!validateRes.ok) {
+        const err = await validateRes.json().catch(() => ({ error: `HTTP ${validateRes.status}` }));
+        throw new Error(err.error || `HTTP ${validateRes.status}`);
+      }
+
+      const { valid, errors } = await validateRes.json() as {
+        valid: boolean;
+        errors: { file: string; error: string; line?: number }[];
+      };
+
+      if (valid) {
+        updateStepStatus("validate", "done");
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.key === "validate"
+              ? {
+                  ...s,
+                  status: "done" as StepStatus,
+                  detail: iteration === 1
+                    ? "Aucune erreur détectée"
+                    : `Toutes les erreurs corrigées`,
+                }
+              : s
+          )
+        );
+        markNextInProgress("validate");
+        return;
+      }
+
+      // Group errors by file
+      const errorsByFile = new Map<string, string[]>();
+      for (const e of errors) {
+        const list = errorsByFile.get(e.file) || [];
+        list.push(e.line ? `line ${e.line}: ${e.error}` : e.error);
+        errorsByFile.set(e.file, list);
+      }
+
+      const fileCount = errorsByFile.size;
+      setSteps((prev) =>
+        prev.map((s) =>
+          s.key === "validate"
+            ? {
+                ...s,
+                detail: `${errors.length} erreur(s) dans ${fileCount} fichier(s), correction...`,
+              }
+            : s
+        )
+      );
+
+      // Fix each file (one API call per file, sequential)
+      for (const [filePath, fileErrors] of errorsByFile) {
+        if (signal.aborted) return;
+
+        const fixRes = await fetch("/api/create-site/fix-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ siteId, filePath, errors: fileErrors }),
+          signal,
+        });
+
+        if (!fixRes.ok) {
+          const err = await fixRes.json().catch(() => ({ error: `HTTP ${fixRes.status}` }));
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.key === "validate"
+                ? { ...s, detail: `Échec correction ${filePath}: ${err.error}` }
+                : s
+            )
+          );
+        } else {
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.key === "validate"
+                ? {
+                    ...s,
+                    detail: `Corrigé: ${filePath.split("/").pop()}`,
+                  }
+                : s
+            )
+          );
+        }
+      }
+    }
+
+    // After max iterations, mark as done anyway (best effort)
+    updateStepStatus("validate", "done");
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.key === "validate"
+          ? { ...s, status: "done" as StepStatus, detail: "Validation terminée (certaines erreurs peuvent persister)" }
+          : s
+      )
+    );
+    markNextInProgress("validate");
+  }
+
   async function runRepoFlow(computedSlug: string, signal: AbortSignal) {
     // Repo + existing modes still use the old single-endpoint approach
     // Init
@@ -751,7 +870,7 @@ export default function CreateSitePage() {
         if (aborted) return;
         await generateFilesSequentially(siteId, config, signal);
         if (aborted) return;
-        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
+        await validateAndFix(siteId, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
@@ -760,13 +879,13 @@ export default function CreateSitePage() {
         // Architecture already done, re-generate all files + validate + deploy + articles
         await generateFilesSequentially(siteId, config, signal);
         if (aborted) return;
-        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
+        await validateAndFix(siteId, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
       } else if (failedStep === "validate") {
-        await streamEndpoint("/api/create-site/validate", { siteId }, handleStreamEvent, signal);
+        await validateAndFix(siteId, signal);
         if (aborted) return;
         await streamEndpoint("/api/create-site/deploy", { siteId }, handleStreamEvent, signal);
         if (aborted) return;
