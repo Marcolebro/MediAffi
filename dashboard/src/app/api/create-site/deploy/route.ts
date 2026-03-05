@@ -75,7 +75,19 @@ export async function POST(request: Request) {
         fileMap.set(f.path, f);
       }
 
-      // Overlay generated files (filter invalid entries)
+      // Starter infrastructure files that must NEVER be overwritten by generated code
+      const PROTECTED_PATHS = new Set([
+        "src/lib/articles.ts",
+        "src/lib/products.ts",
+        "src/lib/utils.ts",
+        "src/lib/supabase.ts",
+        "src/app/go/[slug]/route.ts",
+        "src/app/api/newsletter/route.ts",
+        "src/app/sitemap.ts",
+        "src/app/robots.ts",
+      ]);
+
+      // Overlay generated files (filter invalid entries, protect starter infra)
       if (generatedFiles?.files) {
         for (const gf of generatedFiles.files) {
           if (!gf.path || typeof gf.path !== "string" || !gf.path.trim()) {
@@ -86,9 +98,23 @@ export async function POST(request: Request) {
             send({ step: "github", status: "progress", message: `Fichier ignoré (contenu vide): ${gf.path}` });
             continue;
           }
+          if (PROTECTED_PATHS.has(gf.path)) {
+            send({ step: "github", status: "progress", message: `Fichier protégé (starter): ${gf.path}` });
+            continue;
+          }
+
+          // Fix globals.css import path in layout.tsx
+          let content = gf.content;
+          if (gf.path === "src/app/layout.tsx") {
+            content = content.replace(
+              /import\s+["']\.\/globals\.css["']/g,
+              'import "@/styles/globals.css"'
+            );
+          }
+
           fileMap.set(gf.path, {
             path: gf.path,
-            content: Buffer.from(gf.content).toString("base64"),
+            content: Buffer.from(content).toString("base64"),
             encoding: "base64",
           });
         }

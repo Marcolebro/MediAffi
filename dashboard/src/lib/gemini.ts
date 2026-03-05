@@ -22,13 +22,14 @@ const BASE_SYSTEM_PROMPT = `Tu es un développeur frontend senior spécialisé N
 - lucide-react pour les icônes
 - next-mdx-remote/rsc pour le rendu des articles MDX
 - Tu peux ajouter d'autres librairies dans le champ "dependencies" si nécessaire (framer-motion, @radix-ui, etc.)
+- N'utilise PAS "import React from 'react'" — React 19 n'en a pas besoin
 
-## INFRASTRUCTURE EXISTANTE (ne pas recréer)
-Ces fichiers existent déjà dans le starter et fonctionnent. Tu ne dois PAS les recréer sauf si tu as besoin de les modifier :
-- src/lib/products.ts — getProduct(slug), getAllProducts(), getProductsByCategory(cat). Lit site-data/products.json
-- src/lib/articles.ts — getAllArticles(), getArticle(slug), getArticlesByCategory(cat). Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
-- src/lib/supabase.ts — client Supabase, trackAffiliateClick()
-- src/lib/utils.ts — cn(), formatDate(), slugify()
+## INFRASTRUCTURE EXISTANTE (NE PAS recréer, NE PAS écraser)
+Les fichiers suivants existent déjà dans le projet et sont disponibles à l'import. Tu ne dois JAMAIS générer de fichier avec ces chemins :
+- src/lib/products.ts — import { getProduct, getAllProducts, getProductsByCategory } from "@/lib/products". Lit site-data/products.json
+- src/lib/articles.ts — import { getAllArticles, getArticle, getArticlesByCategory, getArticleSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
+- src/lib/supabase.ts — import { supabase, trackAffiliateClick } from "@/lib/supabase". Client Supabase
+- src/lib/utils.ts — import { cn, formatDate, slugify } from "@/lib/utils"
 - src/app/go/[slug]/route.ts — redirect affilié. Tous les CTA d'affiliation doivent pointer vers /go/{product.affiliate_slug}
 - src/app/api/newsletter/route.ts — POST { email }
 - src/app/sitemap.ts — auto
@@ -272,15 +273,21 @@ const SHARED_CONTEXT = `## STACK TECHNIQUE
 - next/font/google pour les fonts
 - lucide-react pour les icônes
 - next-mdx-remote/rsc pour le rendu des articles MDX
+- N'utilise PAS "import React from 'react'" — React 19 n'en a pas besoin
 
-## INFRASTRUCTURE EXISTANTE (ne pas recréer)
-- src/lib/products.ts — getProduct(slug), getAllProducts(), getProductsByCategory(cat). Lit site-data/products.json
-- src/lib/articles.ts — getAllArticles(), getArticle(slug), getArticlesByCategory(cat). Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
-- src/lib/supabase.ts — client Supabase, trackAffiliateClick()
-- src/lib/utils.ts — cn(), formatDate(), slugify()
+## INFRASTRUCTURE EXISTANTE (NE PAS recréer, NE PAS écraser)
+Les fichiers suivants existent déjà dans le projet et sont disponibles à l'import. Tu ne dois JAMAIS générer de fichier avec ces chemins :
+- src/lib/products.ts — import { getProduct, getAllProducts, getProductsByCategory } from "@/lib/products". Lit site-data/products.json
+- src/lib/articles.ts — import { getAllArticles, getArticle, getArticlesByCategory, getArticleSlugs } from "@/lib/articles". Lit content/articles/*.mdx (frontmatter: title, date, category, meta_description, tags, author, image)
+- src/lib/supabase.ts — import { supabase, trackAffiliateClick } from "@/lib/supabase". Client Supabase
+- src/lib/utils.ts — import { cn, formatDate, slugify } from "@/lib/utils"
 - src/app/go/[slug]/route.ts — redirect affilié. CTA d'affiliation → /go/{product.affiliate_slug}
 - src/app/api/newsletter/route.ts — POST { email }
-- src/app/sitemap.ts et src/app/robots.ts — auto`;
+- src/app/sitemap.ts et src/app/robots.ts — auto
+
+## FICHIER CSS GLOBAL
+Le fichier CSS global est à src/styles/globals.css. Dans layout.tsx, importe-le avec : import "@/styles/globals.css"
+N'utilise JAMAIS import "./globals.css" — le chemin correct est toujours "@/styles/globals.css".`;
 
 const SHARED_RULES = `## REGLES
 - TypeScript strict, aucun any
@@ -494,7 +501,7 @@ export function slugToFilePath(slug: string): string {
 
 export function getLayoutFilePaths(arch: GeminiArchitectureResult): { path: string; description: string }[] {
   const files: { path: string; description: string }[] = [
-    { path: "src/app/layout.tsx", description: `Root layout avec fonts (${arch.fonts.heading}/${arch.fonts.body}), import globals.css, html lang="fr", Header + Footer wrapping {children}, metadata title/description` },
+    { path: "src/app/layout.tsx", description: `Root layout avec fonts (${arch.fonts.heading}/${arch.fonts.body}), import "@/styles/globals.css" (PAS ./globals.css), html lang="fr", Header + Footer wrapping {children}, metadata title/description. N'utilise PAS import React from 'react'.` },
     { path: "src/styles/globals.css", description: "Tailwind CSS 4 + custom styles + animations + variables de couleurs du site" },
   ];
 
