@@ -6,7 +6,7 @@ import { stripCodeFences } from "@/lib/gemini";
 import { readStarterFiles } from "../shared";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 type FixFileBody = {
   siteId: string;
