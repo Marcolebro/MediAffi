@@ -121,17 +121,39 @@ const SHADCN_CLASSES = [
 
 // ─── Mechanical auto-fixes ───
 
-function autoFixUseClient(content: string): string {
+function autoFixUseClient(filePath: string, content: string): string {
   const needsUseClient = CLIENT_INDICATORS.test(content);
   if (!needsUseClient) return content;
 
+  const hasMetadataExport = /export\s+const\s+metadata\b/.test(content);
+
+  // Bug #1: "use client" + export const metadata are incompatible.
+  // If both present, strip metadata (the layout handles it).
+  let result = content;
+  if (hasMetadataExport && needsUseClient) {
+    // Remove the entire export const metadata = { ... }; block
+    // Handles multi-line: export const metadata = { ... };
+    result = result.replace(
+      /export\s+const\s+metadata\s*(?::[\s\S]*?)?\s*=\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}\s*;?\s*\n?/g,
+      ""
+    );
+    // Also remove Metadata type import if now unused
+    result = result.replace(
+      /import\s+(?:type\s+)?\{\s*(?:type\s+)?Metadata\s*\}\s*from\s*["']next["'];?\s*\n?/g,
+      ""
+    );
+    // Clean up: if Metadata was one of multiple imports
+    result = result.replace(/,\s*(?:type\s+)?Metadata\b/g, "");
+    result = result.replace(/\b(?:type\s+)?Metadata\s*,\s*/g, "");
+  }
+
   // Remove any existing "use client" from wrong position
-  const cleaned = content.replace(/^\s*["']use client["'];?\s*\n?/gm, "");
+  const cleaned = result.replace(/^\s*["']use client["'];?\s*\n?/gm, "");
   const trimmed = cleaned.trimStart();
 
   // Check if already first line
-  if (content.trimStart().startsWith('"use client"') || content.trimStart().startsWith("'use client'")) {
-    return content;
+  if (result.trimStart().startsWith('"use client"') || result.trimStart().startsWith("'use client'")) {
+    return result;
   }
 
   return '"use client";\n\n' + trimmed;
@@ -159,9 +181,10 @@ function autoFixTrackAffiliateClick(content: string): string {
     ""
   );
 
-  // Replace calls: trackAffiliateClick(...) → /* tracking via /go/ */
+  // Replace calls: trackAffiliateClick(...)  and  trackAffiliateClick(...).catch(...)
+  // Must match the full chain including optional .catch/.then/.finally
   result = result.replace(
-    /(?:await\s+)?trackAffiliateClick\s*\([^)]*\)\s*;?/g,
+    /(?:await\s+)?trackAffiliateClick\s*\([^)]*\)(?:\s*\.(?:catch|then|finally)\s*\([^)]*\))*\s*;?/g,
     "/* tracking via /go/ */"
   );
 
@@ -273,7 +296,7 @@ function autoFix(filePath: string, content: string): string {
   if (filePath.endsWith(".css")) {
     result = autoFixGlobalsCss(result);
   } else if (/\.(tsx?|jsx?)$/.test(filePath)) {
-    result = autoFixUseClient(result);
+    result = autoFixUseClient(filePath, result);
     result = autoFixTrackAffiliateClick(result);
     result = autoFixDuplicateExports(result);
     result = autoFixDefaultExport(filePath, result);
@@ -353,6 +376,40 @@ function validateFile(
       file: filePath,
       error: `Unnecessary "import React from 'react'" — React 19 doesn't need it`,
     });
+  }
+
+  // JSX tag balance check for .tsx files
+  if (filePath.endsWith(".tsx")) {
+    const jsxOpen: string[] = [];
+    // Match opening <Tag and closing </Tag> (skip self-closing <Tag />)
+    const tagRegex = /<\/?([A-Z][a-zA-Z0-9]*|[a-z][a-z0-9-]*)\b[^>]*?\/?>/g;
+    let tagMatch;
+    while ((tagMatch = tagRegex.exec(content)) !== null) {
+      const full = tagMatch[0];
+      const tagName = tagMatch[1];
+      if (full.endsWith("/>")) continue; // self-closing
+      if (full.startsWith("</")) {
+        // closing tag
+        if (jsxOpen.length > 0 && jsxOpen[jsxOpen.length - 1] === tagName) {
+          jsxOpen.pop();
+        } else {
+          // Mismatch — report and stop
+          errors.push({
+            file: filePath,
+            error: `JSX syntax error: unexpected closing </${tagName}>, expected </${jsxOpen[jsxOpen.length - 1] || "?"}>`,
+          });
+          break;
+        }
+      } else {
+        jsxOpen.push(tagName);
+      }
+    }
+    if (jsxOpen.length > 0 && !errors.some((e) => e.error.startsWith("JSX syntax"))) {
+      errors.push({
+        file: filePath,
+        error: `JSX syntax error: unclosed tag(s): ${jsxOpen.slice(-3).map((t) => "<" + t + ">").join(", ")}`,
+      });
+    }
   }
 
   return errors;
