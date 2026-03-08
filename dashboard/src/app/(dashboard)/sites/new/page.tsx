@@ -495,15 +495,56 @@ export default function CreateSitePage() {
     }
   }
 
+  /** Fetch with auto-retry (2 retries on network/server errors) */
+  async function fetchWithRetry(
+    url: string,
+    init: RequestInit,
+    retries = 2
+  ): Promise<Response> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url, init);
+        // Retry on 5xx, not on 4xx
+        if (res.ok || res.status < 500) return res;
+        if (attempt < retries) continue;
+        return res;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") throw err;
+        if (attempt === retries) throw err;
+        // Brief pause before retry
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+    throw new Error("Unreachable");
+  }
+
   async function generateFilesSequentially(
     siteId: string,
     config: ReturnType<typeof buildGenerateConfig>,
-    signal: AbortSignal
+    signal: AbortSignal,
+    resumeMode = false
   ) {
     const layoutFiles = layoutFilesRef.current;
     const pageFiles = pageFilesRef.current;
     const allFiles = [...layoutFiles, ...pageFiles];
     const totalCount = allFiles.length;
+
+    // When resuming, fetch already-generated file paths from DB
+    let alreadyGenerated = new Set<string>();
+    if (resumeMode) {
+      try {
+        const siteRes = await fetch(`/api/sites/${siteId}`, { signal });
+        if (siteRes.ok) {
+          const siteData = await siteRes.json();
+          const files = siteData?.generated_files?.files;
+          if (Array.isArray(files)) {
+            alreadyGenerated = new Set(files.map((f: { path: string }) => f.path));
+          }
+        }
+      } catch {
+        // If we can't fetch, regenerate everything
+      }
+    }
 
     // Collected during layout phase, passed to page phase
     const availableComponents: { path: string; exports: string[] }[] = [];
@@ -516,6 +557,18 @@ export default function CreateSitePage() {
         const file = layoutFiles[i];
         const fileName = file.path.split("/").pop();
 
+        // Skip already-generated files in resume mode
+        if (resumeMode && alreadyGenerated.has(file.path)) {
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.key === "generate_files"
+                ? { ...s, status: "in_progress", detail: `${i + 1}/${totalCount} — ${fileName} (déjà généré)` }
+                : s
+            )
+          );
+          continue;
+        }
+
         setSteps((prev) =>
           prev.map((s) =>
             s.key === "generate_files"
@@ -524,7 +577,7 @@ export default function CreateSitePage() {
           )
         );
 
-        const res = await fetch("/api/create-site/generate-file", {
+        const res = await fetchWithRetry("/api/create-site/generate-file", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -573,6 +626,18 @@ export default function CreateSitePage() {
         const globalIdx = offset + i + 1;
         const isLast = i === pageFiles.length - 1;
 
+        // Skip already-generated files in resume mode
+        if (resumeMode && alreadyGenerated.has(file.path)) {
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.key === "generate_files"
+                ? { ...s, status: "in_progress", detail: `${globalIdx}/${totalCount} — ${fileName} (déjà généré)` }
+                : s
+            )
+          );
+          continue;
+        }
+
         setSteps((prev) =>
           prev.map((s) =>
             s.key === "generate_files"
@@ -581,7 +646,7 @@ export default function CreateSitePage() {
           )
         );
 
-        const res = await fetch("/api/create-site/generate-file", {
+        const res = await fetchWithRetry("/api/create-site/generate-file", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -876,8 +941,8 @@ export default function CreateSitePage() {
         if (aborted) return;
         await streamEndpoint("/api/create-site/articles", { siteId }, handleStreamEvent, signal);
       } else if (failedStep === "generate_files") {
-        // Architecture already done, re-generate all files + validate + deploy + articles
-        await generateFilesSequentially(siteId, config, signal);
+        // Resume: only generate missing files + validate + deploy + articles
+        await generateFilesSequentially(siteId, config, signal, true);
         if (aborted) return;
         await validateAndFix(siteId, signal);
         if (aborted) return;
